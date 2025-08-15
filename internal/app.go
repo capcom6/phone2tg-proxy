@@ -1,10 +1,12 @@
 package internal
 
 import (
+	"github.com/capcom6/phone2tg-proxy/internal/bot"
 	"github.com/capcom6/phone2tg-proxy/internal/config"
 	"github.com/capcom6/phone2tg-proxy/internal/server"
 	"github.com/capcom6/phone2tg-proxy/pkg/http"
 	"github.com/capcom6/phone2tg-proxy/pkg/logger"
+	"github.com/capcom6/phone2tg-proxy/pkg/telegram"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 	"go.uber.org/zap"
@@ -21,10 +23,9 @@ func Run() {
 		}),
 		config.Module(),
 		http.Module(),
-		server.Module(),
+		telegram.Module(),
 		//
-		fx.Invoke(func(logger *zap.Logger) {
-			logger.Info("Hello, World!")
-		}),
+		server.Module(),
+		bot.Module(),
 	).Run()
 }
