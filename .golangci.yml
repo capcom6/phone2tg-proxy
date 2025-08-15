@@ -211,6 +211,9 @@ linters:
         - "^gopkg.in/yaml.v3.Node$"
         - "^github.com/gofiber/fiber/v2.Config$"
         - "^github.com/gofiber/contrib/fiberzap/v2.Config$"
+        - "^gopkg.in/telebot.v4.Settings$"
+        - "^gopkg.in/telebot.v4.LongPoller$"
+        - "^gopkg.in/telebot.v4.ReplyMarkup$"
 
     funlen:
       # Checks the number of lines in a function.

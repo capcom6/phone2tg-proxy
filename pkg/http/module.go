@@ -20,6 +20,7 @@ func Module() fx.Option {
 		fx.Invoke(func(lc fx.Lifecycle, cfg Config, app *fiber.App, logger *zap.Logger, sd fx.Shutdowner) {
 			lc.Append(fx.Hook{
 				OnStart: func(ctx context.Context) error {
+					logger.Info("starting server")
 					ln, err := (&net.ListenConfig{}).Listen(ctx, "tcp", cfg.Address)
 					if err != nil {
 						return fmt.Errorf("listen %s: %w", cfg.Address, err)
