@@ -186,6 +186,7 @@ linters:
       # Default: []
       exclude:
         # std libs
+        - "^net.ListenConfig$"
         - "^net/http.Client$"
         - "^net/http.Cookie$"
         - "^net/http.Request$"
@@ -208,6 +209,8 @@ linters:
         - "^golang.org/x/tools/go/analysis.Analyzer$"
         - "^google.golang.org/protobuf/.+Options$"
         - "^gopkg.in/yaml.v3.Node$"
+        - "^github.com/gofiber/fiber/v2.Config$"
+        - "^github.com/gofiber/contrib/fiberzap/v2.Config$"
 
     funlen:
       # Checks the number of lines in a function.
