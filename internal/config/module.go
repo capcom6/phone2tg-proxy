@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/capcom6/phone2tg-proxy/internal/bot"
 	"github.com/capcom6/phone2tg-proxy/pkg/http"
 	"go.uber.org/fx"
 )
@@ -17,6 +18,11 @@ func Module() fx.Option {
 				Address:     cfg.HTTP.Address,
 				ProxyHeader: cfg.HTTP.ProxyHeader,
 				Proxies:     cfg.HTTP.Proxies,
+			}
+		}),
+		fx.Provide(func(cfg Config) bot.Config {
+			return bot.Config{
+				Token: cfg.Telegram.Token,
 			}
 		}),
 	)

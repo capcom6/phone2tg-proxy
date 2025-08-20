@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"github.com/capcom6/phone2tg-proxy/internal/bot"
 	"github.com/capcom6/phone2tg-proxy/internal/config"
 	"github.com/capcom6/phone2tg-proxy/internal/server"
 	"github.com/capcom6/phone2tg-proxy/pkg/http"
@@ -22,6 +23,7 @@ func Run() {
 		config.Module(),
 		http.Module(),
 		server.Module(),
+		bot.Module(),
 		//
 		fx.Invoke(func(logger *zap.Logger) {
 			logger.Info("Hello, World!")
