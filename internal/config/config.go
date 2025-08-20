@@ -16,9 +16,19 @@ type telegramConfig struct {
 	Token string `koanf:"token"`
 }
 
+type redisConfig struct {
+	URL string `koanf:"url"`
+}
+
+type storageConfig struct {
+	Secret string `koanf:"secret"`
+}
+
 type Config struct {
 	HTTP     httpConfig     `koanf:"http"`
 	Telegram telegramConfig `koanf:"telegram"`
+	Redis    redisConfig    `koanf:"redis"`
+	Storage  storageConfig  `koanf:"storage"`
 }
 
 func New() (Config, error) {
@@ -30,6 +40,12 @@ func New() (Config, error) {
 		},
 		Telegram: telegramConfig{
 			Token: "",
+		},
+		Redis: redisConfig{
+			URL: "redis://localhost:6379/0",
+		},
+		Storage: storageConfig{
+			Secret: "",
 		},
 	}
 

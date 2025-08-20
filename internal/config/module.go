@@ -1,7 +1,9 @@
 package config
 
 import (
+	"github.com/capcom6/phone2tg-proxy/internal/storage"
 	"github.com/capcom6/phone2tg-proxy/pkg/http"
+	"github.com/capcom6/phone2tg-proxy/pkg/redis"
 	"github.com/capcom6/phone2tg-proxy/pkg/telegram"
 	"go.uber.org/fx"
 )
@@ -27,5 +29,15 @@ func Module() fx.Option {
 				}
 			},
 		),
+		fx.Provide(func(cfg Config) redis.Config {
+			return redis.Config{
+				URL: cfg.Redis.URL,
+			}
+		}),
+		fx.Provide(func(cfg Config) storage.Config {
+			return storage.Config{
+				Secret: []byte(cfg.Storage.Secret),
+			}
+		}),
 	)
 }
