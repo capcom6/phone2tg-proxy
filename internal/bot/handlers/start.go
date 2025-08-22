@@ -1,18 +1,24 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"github.com/capcom6/phone2tg-proxy/internal/bot/fsm"
 	"github.com/capcom6/phone2tg-proxy/internal/bot/router"
+	"github.com/capcom6/phone2tg-proxy/internal/storage"
 	"gopkg.in/telebot.v4"
 )
 
 type StartHandler struct {
+	storage storage.Service
 }
 
-func NewStartHandler() *StartHandler {
-	return &StartHandler{}
+func NewStartHandler(storage storage.Service) *StartHandler {
+	return &StartHandler{
+		storage: storage,
+	}
 }
 
 func (h *StartHandler) Register(r *router.Router) error {
@@ -32,6 +38,13 @@ func (h *StartHandler) Register(r *router.Router) error {
 
 		if contact.UserID != c.Chat().ID {
 			return c.Send("You must share your contact with me", h.makeShareContactKeyboard())
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		defer cancel()
+
+		if err := h.storage.Store(ctx, contact.PhoneNumber, c.Chat().ID); err != nil {
+			return fmt.Errorf("set phone number: %w", err)
 		}
 
 		if err := s.Delete(); err != nil {
