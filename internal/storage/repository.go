@@ -4,21 +4,25 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/redis/go-redis/v9"
 )
 
-const keyPrefix = "p2tg:phone:"
+const (
+	keyPrefixPhone = "p2tg:phone:"
+	keyPrefixTg    = "p2tg:tg:"
+)
 
 var (
 	ErrPhoneNumberNotFound = errors.New("phone number not found")
 )
 
-//nolint:iface // interface is required
 type Repository interface {
 	Store(ctx context.Context, phoneNumber string, telegramID int64) error
 	Get(ctx context.Context, phoneNumber string) (int64, error)
-	Delete(ctx context.Context, phoneNumber string) error
+	DeleteByPhoneNumber(ctx context.Context, phoneNumber string) error
+	DeleteByTelegramID(ctx context.Context, telegramID int64) error
 }
 
 type repository struct {
@@ -32,14 +36,20 @@ func newRepository(client *redis.Client) Repository {
 }
 
 func (r *repository) Store(ctx context.Context, phoneNumber string, telegramID int64) error {
-	if err := r.client.Set(ctx, makeKey(phoneNumber), telegramID, 0).Err(); err != nil {
+	pipe := r.client.Pipeline()
+
+	pipe.Set(ctx, makePhoneKey(phoneNumber), telegramID, 0)
+	pipe.Set(ctx, makeTgKey(telegramID), phoneNumber, 0)
+
+	if _, err := pipe.Exec(ctx); err != nil {
 		return fmt.Errorf("repository: %w", err)
 	}
+
 	return nil
 }
 
 func (r *repository) Get(ctx context.Context, phoneNumber string) (int64, error) {
-	result, err := r.client.Get(ctx, makeKey(phoneNumber)).Int64()
+	result, err := r.client.Get(ctx, makePhoneKey(phoneNumber)).Int64()
 	if errors.Is(err, redis.Nil) {
 		return 0, ErrPhoneNumberNotFound
 	}
@@ -50,11 +60,48 @@ func (r *repository) Get(ctx context.Context, phoneNumber string) (int64, error)
 	return result, nil
 }
 
-func (r *repository) Delete(ctx context.Context, phoneNumber string) error {
-	if err := r.client.Del(ctx, makeKey(phoneNumber)).Err(); err != nil {
+func (r *repository) DeleteByPhoneNumber(ctx context.Context, phoneNumber string) error {
+	telegramID, err := r.Get(ctx, phoneNumber)
+	if errors.Is(err, ErrPhoneNumberNotFound) {
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+
+	return r.delete(ctx, phoneNumber, telegramID)
+}
+
+func (r *repository) DeleteByTelegramID(ctx context.Context, telegramID int64) error {
+	phoneNumber, err := r.client.Get(ctx, makeTgKey(telegramID)).Result()
+	if errors.Is(err, redis.Nil) {
+		return nil
+	}
+
+	if err != nil {
 		return fmt.Errorf("repository: %w", err)
 	}
+
+	if err := r.delete(ctx, phoneNumber, telegramID); err != nil {
+		return fmt.Errorf("repository: %w", err)
+	}
+
 	return nil
 }
 
-func makeKey(k string) string { return keyPrefix + k }
+func (r *repository) delete(ctx context.Context, phoneNumber string, telegramID int64) error {
+	pipe := r.client.Pipeline()
+
+	pipe.Del(ctx, makePhoneKey(phoneNumber))
+	pipe.Del(ctx, makeTgKey(telegramID))
+
+	if _, err := pipe.Exec(ctx); err != nil {
+		return fmt.Errorf("delete: %w", err)
+	}
+
+	return nil
+}
+
+func makePhoneKey(k string) string { return keyPrefixPhone + k }
+func makeTgKey(k int64) string     { return keyPrefixTg + strconv.FormatInt(k, 10) }

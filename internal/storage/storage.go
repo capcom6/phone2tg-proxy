@@ -16,11 +16,10 @@ var (
 	ErrInvalidPhoneNumber = errors.New("invalid phone number")
 )
 
-//nolint:iface // interface is required
 type Service interface {
 	Store(ctx context.Context, phoneNumber string, telegramID int64) error
 	Get(ctx context.Context, phoneNumber string) (int64, error)
-	Delete(ctx context.Context, phoneNumber string) error
+	Delete(ctx context.Context, telegramID int64) error
 }
 
 type service struct {
@@ -81,13 +80,8 @@ func (s *service) Get(ctx context.Context, phoneNumber string) (int64, error) {
 	return id, nil
 }
 
-func (s *service) Delete(ctx context.Context, phoneNumber string) error {
-	hashed, err := s.preparePhoneNumber(phoneNumber)
-	if err != nil {
-		return fmt.Errorf("service: %w", err)
-	}
-
-	if err := s.r.Delete(ctx, hashed); err != nil {
+func (s *service) Delete(ctx context.Context, telegramID int64) error {
+	if err := s.r.DeleteByTelegramID(ctx, telegramID); err != nil {
 		return fmt.Errorf("service: %w", err)
 	}
 
