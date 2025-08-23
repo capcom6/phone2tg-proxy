@@ -30,6 +30,7 @@ func Module() fx.Option {
 		),
 		fx.Provide(
 			handlers.NewStartHandler,
+			handlers.NewStopHandler,
 			fx.Private,
 		),
 
@@ -38,6 +39,7 @@ func Module() fx.Option {
 			fsm *fsm.Service,
 			logger *zap.Logger,
 			startHandler *handlers.StartHandler,
+			stopHandler *handlers.StopHandler,
 		) error {
 			bot.Use(middleware.Logger(logger))
 
@@ -46,6 +48,11 @@ func Module() fx.Option {
 			if err := startHandler.Register(rt); err != nil {
 				return fmt.Errorf("register start handler: %w", err)
 			}
+
+			if err := stopHandler.Register(rt); err != nil {
+				return fmt.Errorf("register stop handler: %w", err)
+			}
+
 			return nil
 		}),
 	)
