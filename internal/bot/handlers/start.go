@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -44,6 +45,9 @@ func (h *StartHandler) Register(r *router.Router) error {
 		defer cancel()
 
 		if err := h.storage.Store(ctx, contact.PhoneNumber, c.Chat().ID); err != nil {
+			if errors.Is(err, storage.ErrInvalidPhoneNumber) {
+				return c.Send("Invalid phone number format. Please share your contact again.")
+			}
 			return fmt.Errorf("set phone number: %w", err)
 		}
 

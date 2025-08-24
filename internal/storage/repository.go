@@ -36,13 +36,17 @@ func newRepository(client *redis.Client) Repository {
 }
 
 func (r *repository) Store(ctx context.Context, phoneNumber string, telegramID int64) error {
-	pipe := r.client.Pipeline()
+	if err := r.delete(ctx, phoneNumber, telegramID); err != nil {
+		return fmt.Errorf("store: %w", err)
+	}
 
-	pipe.Set(ctx, makePhoneKey(phoneNumber), telegramID, 0)
-	pipe.Set(ctx, makeTgKey(telegramID), phoneNumber, 0)
-
-	if _, err := pipe.Exec(ctx); err != nil {
-		return fmt.Errorf("repository: %w", err)
+	err := r.client.MSet(
+		ctx,
+		makePhoneKey(phoneNumber), telegramID,
+		makeTgKey(telegramID), phoneNumber,
+	).Err()
+	if err != nil {
+		return fmt.Errorf("store: %w", err)
 	}
 
 	return nil
@@ -54,7 +58,7 @@ func (r *repository) Get(ctx context.Context, phoneNumber string) (int64, error)
 		return 0, ErrPhoneNumberNotFound
 	}
 	if err != nil {
-		return 0, fmt.Errorf("repository: %w", err)
+		return 0, fmt.Errorf("get: %w", err)
 	}
 
 	return result, nil
@@ -80,23 +84,18 @@ func (r *repository) DeleteByTelegramID(ctx context.Context, telegramID int64) e
 	}
 
 	if err != nil {
-		return fmt.Errorf("repository: %w", err)
+		return fmt.Errorf("delete by telegram id: %w", err)
 	}
 
 	if err := r.delete(ctx, phoneNumber, telegramID); err != nil {
-		return fmt.Errorf("repository: %w", err)
+		return fmt.Errorf("delete by telegram id: %w", err)
 	}
 
 	return nil
 }
 
 func (r *repository) delete(ctx context.Context, phoneNumber string, telegramID int64) error {
-	pipe := r.client.Pipeline()
-
-	pipe.Del(ctx, makePhoneKey(phoneNumber))
-	pipe.Del(ctx, makeTgKey(telegramID))
-
-	if _, err := pipe.Exec(ctx); err != nil {
+	if err := r.client.Del(ctx, makePhoneKey(phoneNumber), makeTgKey(telegramID)).Err(); err != nil {
 		return fmt.Errorf("delete: %w", err)
 	}
 
