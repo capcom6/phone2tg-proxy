@@ -7,6 +7,7 @@ import (
 	"github.com/capcom6/phone2tg-proxy/internal/bot/handlers"
 	"github.com/capcom6/phone2tg-proxy/internal/bot/middleware"
 	"github.com/capcom6/phone2tg-proxy/internal/bot/router"
+	"github.com/capcom6/phone2tg-proxy/pkg/fxutil"
 	"github.com/gofiber/storage/memory/v2"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -16,9 +17,7 @@ import (
 func Module() fx.Option {
 	return fx.Module(
 		"bot",
-		fx.Decorate(func(log *zap.Logger) *zap.Logger {
-			return log.Named("bot")
-		}),
+		fxutil.WithNamedLogger("bot"),
 		fx.Provide(
 			func() fsm.Storage {
 				return memory.New()

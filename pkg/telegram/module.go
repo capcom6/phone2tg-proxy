@@ -3,6 +3,7 @@ package telegram
 import (
 	"context"
 
+	"github.com/capcom6/phone2tg-proxy/pkg/fxutil"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"gopkg.in/telebot.v4"
@@ -11,9 +12,7 @@ import (
 func Module() fx.Option {
 	return fx.Module(
 		"telegram",
-		fx.Decorate(func(log *zap.Logger) *zap.Logger {
-			return log.Named("telegram")
-		}),
+		fxutil.WithNamedLogger("telegram"),
 		fx.Provide(New),
 		fx.Invoke(func(lc fx.Lifecycle, bot *telebot.Bot, logger *zap.Logger) {
 			lc.Append(fx.Hook{

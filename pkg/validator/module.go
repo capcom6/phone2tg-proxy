@@ -1,4 +1,4 @@
-package storage
+package validator
 
 import (
 	"github.com/capcom6/phone2tg-proxy/pkg/fxutil"
@@ -7,12 +7,8 @@ import (
 
 func Module() fx.Option {
 	return fx.Module(
-		"storage",
-		fxutil.WithNamedLogger("storage"),
-		fx.Provide(
-			newRepository,
-			fx.Private,
-		),
+		"validator",
+		fxutil.WithNamedLogger("validator"),
 		fx.Provide(New),
 	)
 }
