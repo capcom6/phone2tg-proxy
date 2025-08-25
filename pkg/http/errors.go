@@ -31,11 +31,17 @@ func NewViewsErrorHandler(logger *zap.Logger, template string, layouts ...string
 }
 
 func NewJSONErrorHandler(logger *zap.Logger) fiber.ErrorHandler {
+	return NewCustomJSONErrorHandler(logger, nil)
+}
+
+func NewCustomJSONErrorHandler(logger *zap.Logger, formatter func(error, int) any) fiber.ErrorHandler {
 	return func(c *fiber.Ctx, err error) error {
 		code := preHandleError(err, logger)
 
-		errorResponse := NewErrorResponse(err.Error(), code, nil)
+		if formatter != nil {
+			return c.Status(code).JSON(formatter(err, code))
+		}
 
-		return c.Status(code).JSON(errorResponse)
+		return c.Status(code).JSON(NewErrorResponse(err.Error(), code, nil))
 	}
 }

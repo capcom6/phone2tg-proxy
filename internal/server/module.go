@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/capcom6/phone2tg-proxy/internal/server/handlers"
 	"github.com/capcom6/phone2tg-proxy/pkg/http"
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
@@ -14,14 +15,23 @@ func Module() fx.Option {
 			return log.Named("server")
 		}),
 
-		fx.Provide(func() http.Options {
-			return http.Options{}
+		fx.Provide(func(log *zap.Logger) http.Options {
+			return *(&http.Options{}).WithErrorHandler(http.NewCustomJSONErrorHandler(log, errorsFormatter))
 		}),
 
-		fx.Invoke(func(app *fiber.App) {
+		fx.Provide(
+			handlers.NewMessagesHandler,
+			fx.Private,
+		),
+
+		fx.Invoke(func(app *fiber.App, messages *handlers.MessagesHandler) {
 			app.Get("/", func(c *fiber.Ctx) error {
 				return c.SendString("Hello, World!")
 			})
+
+			api := app.Group("/api/v1")
+
+			messages.Register(api.Group("/messages"))
 		}),
 	)
 }

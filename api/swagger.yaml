@@ -1,0 +1,70 @@
+definitions:
+  client.ErrorResponse:
+    properties:
+      code:
+        type: integer
+      details: {}
+      message:
+        type: string
+    type: object
+  client.MessagesPOSTRequest:
+    properties:
+      phoneNumber:
+        type: string
+      text:
+        maxLength: 4096
+        minLength: 1
+        type: string
+    required:
+    - phoneNumber
+    - text
+    type: object
+  client.MessagesPOSTResponse:
+    properties:
+      id:
+        type: integer
+    type: object
+info:
+  contact:
+    email: i@capcom.me
+    name: Aleksandr Soloshenko
+  description: API for sending messages to Telegram by phone number
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  title: Phone Number to Telegrtam Proxy
+paths:
+  /messages:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/client.MessagesPOSTRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/client.MessagesPOSTResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/client.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/client.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/client.ErrorResponse'
+      summary: Send message
+      tags:
+      - Messages
+swagger: "2.0"
