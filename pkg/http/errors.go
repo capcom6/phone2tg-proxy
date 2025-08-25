@@ -7,6 +7,41 @@ import (
 	"go.uber.org/zap"
 )
 
+type ErrorFormatter func(err error, code int) any
+
+func NewViewsErrorHandler(logger *zap.Logger, template string, layouts ...string) fiber.ErrorHandler {
+	return func(c *fiber.Ctx, err error) error {
+		code := preHandleError(err, logger)
+
+		if rerr := c.Status(code).Render(template, fiber.Map{"error": err.Error(), "code": code}, layouts...); rerr != nil {
+			logger.Error("failed to render error view", zap.Error(rerr), zap.Int("code", code))
+			return c.Status(code).SendString(err.Error())
+		}
+
+		return nil
+	}
+}
+
+func NewJSONErrorHandler(logger *zap.Logger) fiber.ErrorHandler {
+	return NewCustomJSONErrorHandler(logger, nil)
+}
+
+func NewCustomJSONErrorHandler(logger *zap.Logger, formatter ErrorFormatter) fiber.ErrorHandler {
+	return func(c *fiber.Ctx, err error) error {
+		code := preHandleError(err, logger)
+
+		if formatter != nil {
+			return c.Status(code).JSON(formatter(err, code))
+		}
+
+		msg := err.Error()
+		if code >= fiber.StatusInternalServerError {
+			msg = "internal server error"
+		}
+		return c.Status(code).JSON(NewErrorResponse(msg, code, nil))
+	}
+}
+
 func preHandleError(err error, logger *zap.Logger) int {
 	code := fiber.StatusInternalServerError
 
@@ -20,22 +55,4 @@ func preHandleError(err error, logger *zap.Logger) int {
 	}
 
 	return code
-}
-
-func NewViewsErrorHandler(logger *zap.Logger, template string, layouts ...string) fiber.ErrorHandler {
-	return func(c *fiber.Ctx, err error) error {
-		code := preHandleError(err, logger)
-
-		return c.Status(code).Render(template, fiber.Map{"error": err.Error(), "code": code}, layouts...)
-	}
-}
-
-func NewJSONErrorHandler(logger *zap.Logger) fiber.ErrorHandler {
-	return func(c *fiber.Ctx, err error) error {
-		code := preHandleError(err, logger)
-
-		errorResponse := NewErrorResponse(err.Error(), code, nil)
-
-		return c.Status(code).JSON(errorResponse)
-	}
 }

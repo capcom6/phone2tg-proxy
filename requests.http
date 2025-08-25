@@ -1,4 +1,15 @@
 @baseUrl=http://localhost:3000
 
+@phoneNumber={{$dotenv PHONE}}
+
 ###
 GET {{baseUrl}} HTTP/1.1
+
+###
+POST {{baseUrl}}/api/v1/messages HTTP/1.1
+Content-Type: application/json
+
+{
+    "phoneNumber": "{{phoneNumber}}",
+    "text": "Hello, World!"
+}

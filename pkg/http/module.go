@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/capcom6/phone2tg-proxy/pkg/fxutil"
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -13,9 +14,7 @@ import (
 func Module() fx.Option {
 	return fx.Module(
 		"http",
-		fx.Decorate(func(log *zap.Logger) *zap.Logger {
-			return log.Named("http")
-		}),
+		fxutil.WithNamedLogger("http"),
 		fx.Provide(New),
 		fx.Invoke(func(lc fx.Lifecycle, cfg Config, app *fiber.App, logger *zap.Logger, sd fx.Shutdowner) {
 			lc.Append(fx.Hook{

@@ -1,0 +1,117 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "API for sending messages to Telegram by phone number",
+        "title": "Phone Number to Telegram Proxy",
+        "contact": {
+            "name": "Aleksandr Soloshenko",
+            "email": "i@capcom.me"
+        },
+        "license": {
+            "name": "Apache 2.0",
+            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+        }
+    },
+    "basePath": "/api/v1",
+    "paths": {
+        "/messages": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Messages"
+                ],
+                "summary": "Send message",
+                "parameters": [
+                    {
+                        "description": "Request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/client.MessagesPOSTRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/client.MessagesPOSTResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/client.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/client.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/client.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "client.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "Error code",
+                    "type": "integer"
+                },
+                "details": {
+                    "description": "Optional error details"
+                },
+                "message": {
+                    "description": "Error description",
+                    "type": "string"
+                }
+            }
+        },
+        "client.MessagesPOSTRequest": {
+            "type": "object",
+            "required": [
+                "phoneNumber",
+                "text"
+            ],
+            "properties": {
+                "phoneNumber": {
+                    "description": "Phone number of the recipient",
+                    "type": "string",
+                    "example": "+15551234567"
+                },
+                "text": {
+                    "description": "Message text",
+                    "type": "string",
+                    "maxLength": 4096,
+                    "minLength": 1,
+                    "example": "Hello from phone2tg-proxy"
+                }
+            }
+        },
+        "client.MessagesPOSTResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "description": "Message ID",
+                    "type": "integer"
+                }
+            }
+        }
+    }
+}
