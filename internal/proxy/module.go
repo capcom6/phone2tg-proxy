@@ -1,16 +1,14 @@
 package proxy
 
 import (
+	"github.com/capcom6/phone2tg-proxy/pkg/fxutil"
 	"go.uber.org/fx"
-	"go.uber.org/zap"
 )
 
 func Module() fx.Option {
 	return fx.Module(
 		"proxy",
-		fx.Decorate(func(log *zap.Logger) *zap.Logger {
-			return log.Named("proxy")
-		}),
+		fxutil.WithNamedLogger("proxy"),
 		fx.Provide(New),
 	)
 }

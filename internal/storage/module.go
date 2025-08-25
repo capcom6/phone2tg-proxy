@@ -1,16 +1,14 @@
 package storage
 
 import (
+	"github.com/capcom6/phone2tg-proxy/pkg/fxutil"
 	"go.uber.org/fx"
-	"go.uber.org/zap"
 )
 
 func Module() fx.Option {
 	return fx.Module(
 		"storage",
-		fx.Decorate(func(log *zap.Logger) *zap.Logger {
-			return log.Named("storage")
-		}),
+		fxutil.WithNamedLogger("storage"),
 		fx.Provide(
 			newRepository,
 			fx.Private,

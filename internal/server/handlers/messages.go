@@ -20,12 +20,12 @@ type MessagesHandler struct {
 	handler.Base
 }
 
-func NewMessagesHandler(proxy proxy.Service, validator *validator.Validate, logger *zap.Logger) *MessagesHandler {
+func NewMessagesHandler(proxy proxy.Service, v *validator.Validate, logger *zap.Logger) *MessagesHandler {
 	return &MessagesHandler{
 		proxy: proxy,
 
 		Base: handler.Base{
-			Validator: validator,
+			Validator: v,
 			Logger:    logger,
 		},
 	}
@@ -59,7 +59,6 @@ func (h *MessagesHandler) post(c *fiber.Ctx) error {
 	}
 
 	if err != nil {
-		h.Logger.Error("failed to send message", zap.Any("request", req), zap.Error(err))
 		return fiber.NewError(
 			fiber.StatusInternalServerError,
 			"failed to send message, please try again later or contact support",

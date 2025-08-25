@@ -2,6 +2,7 @@ package server
 
 import (
 	"github.com/capcom6/phone2tg-proxy/internal/server/handlers"
+	"github.com/capcom6/phone2tg-proxy/pkg/fxutil"
 	"github.com/capcom6/phone2tg-proxy/pkg/http"
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
@@ -11,12 +12,12 @@ import (
 func Module() fx.Option {
 	return fx.Module(
 		"server",
-		fx.Decorate(func(log *zap.Logger) *zap.Logger {
-			return log.Named("server")
-		}),
+		fxutil.WithNamedLogger("server"),
 
 		fx.Provide(func(log *zap.Logger) http.Options {
-			return *(&http.Options{}).WithErrorHandler(http.NewCustomJSONErrorHandler(log, errorsFormatter))
+			opts := http.Options{}
+			opts.WithErrorHandler(http.NewCustomJSONErrorHandler(log, errorsFormatter))
+			return opts
 		}),
 
 		fx.Provide(
