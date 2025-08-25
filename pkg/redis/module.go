@@ -4,17 +4,15 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/capcom6/phone2tg-proxy/pkg/fxutil"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/fx"
-	"go.uber.org/zap"
 )
 
 func Module() fx.Option {
 	return fx.Module(
 		"redis",
-		fx.Decorate(func(log *zap.Logger) *zap.Logger {
-			return log.Named("redis")
-		}),
+		fxutil.WithNamedLogger("redis"),
 		fx.Provide(New),
 		fx.Invoke(func(lc fx.Lifecycle, client *redis.Client) {
 			lc.Append(fx.Hook{

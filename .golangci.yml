@@ -353,6 +353,19 @@ linters:
       # Default: false
       os-temp-dir: true
 
+    wrapcheck:
+      ignore-sigs:
+        - .Errorf(
+        - errors.New(
+        - errors.Unwrap(
+        - errors.Join(
+        - .Wrap(
+        - .Wrapf(
+        - .WithMessage(
+        - .WithMessagef(
+        - .WithStack(
+        - .JSON(
+
   exclusions:
     generated: lax
     presets:
