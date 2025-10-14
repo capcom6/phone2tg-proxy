@@ -49,4 +49,8 @@ deps:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	go install github.com/swaggo/swag/cmd/swag@latest
 
-.PHONY: all air test benchmark lint clean run api-docs deps
+# Execute goreleaser for versioned releases
+release:
+	goreleaser release --snapshot --clean
+
+.PHONY: all air test benchmark lint clean run api-docs deps release

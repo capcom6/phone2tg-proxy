@@ -1,0 +1,16 @@
+FROM alpine:3
+
+ARG TARGETPLATFORM
+ARG BINARY_NAME
+
+# Install certificates and timezone data
+RUN apk add --no-cache ca-certificates tzdata
+
+# Set the Current Working Directory inside the container
+WORKDIR /app
+
+# Copy the Pre-built binary file from GoReleaser
+COPY $TARGETPLATFORM/$BINARY_NAME ./app
+
+# Command to run the executable
+ENTRYPOINT ["/app/app"]
