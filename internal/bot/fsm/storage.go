@@ -3,7 +3,7 @@ package fsm
 import "time"
 
 // Storage interface for communicating with different database/key-value
-// providers
+// providers.
 type Storage interface {
 	// Get gets the value for the given key.
 	// `nil, nil` is returned when the key does not exist

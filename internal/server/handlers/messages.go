@@ -15,14 +15,14 @@ import (
 )
 
 type MessagesHandler struct {
-	proxy proxy.Service
-
 	handler.Base
+
+	proxySvc proxy.Service
 }
 
-func NewMessagesHandler(proxy proxy.Service, v *validator.Validate, logger *zap.Logger) *MessagesHandler {
+func NewMessagesHandler(proxySvc proxy.Service, v *validator.Validate, logger *zap.Logger) *MessagesHandler {
 	return &MessagesHandler{
-		proxy: proxy,
+		proxySvc: proxySvc,
 
 		Base: handler.Base{
 			Validator: v,
@@ -31,18 +31,18 @@ func NewMessagesHandler(proxy proxy.Service, v *validator.Validate, logger *zap.
 	}
 }
 
-// @Summary Send message
-// @Tags Messages
-// @Accept json
-// @Produce json
-// @Param request body client.MessagesPOSTRequest true "Request"
-// @Success 200 {object} client.MessagesPOSTResponse
-// @Failure 400 {object} client.ErrorResponse
-// @Failure 404 {object} client.ErrorResponse
-// @Failure 500 {object} client.ErrorResponse
-// @Router /messages [post]
+//	@Summary	Send message
+//	@Tags		Messages
+//	@Accept		json
+//	@Produce	json
+//	@Param		request	body		client.MessagesPOSTRequest	true	"Request"
+//	@Success	200		{object}	client.MessagesPOSTResponse
+//	@Failure	400		{object}	client.ErrorResponse
+//	@Failure	404		{object}	client.ErrorResponse
+//	@Failure	500		{object}	client.ErrorResponse
+//	@Router		/messages [post]
 //
-// Send message
+// Send message.
 func (h *MessagesHandler) post(c *fiber.Ctx) error {
 	req := new(client.MessagesPOSTRequest)
 
@@ -53,7 +53,7 @@ func (h *MessagesHandler) post(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.Context(), 1*time.Second)
 	defer cancel()
 
-	id, err := h.proxy.Send(ctx, req.PhoneNumber, req.Text)
+	id, err := h.proxySvc.Send(ctx, req.PhoneNumber, req.Text)
 	if errors.Is(err, proxy.ErrPhoneNumberNotFound) {
 		return fiber.NewError(fiber.StatusNotFound, "phone number not found")
 	}

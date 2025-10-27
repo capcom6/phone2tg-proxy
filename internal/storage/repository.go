@@ -87,8 +87,8 @@ func (r *repository) DeleteByTelegramID(ctx context.Context, telegramID int64) e
 		return fmt.Errorf("delete by telegram id: %w", err)
 	}
 
-	if err := r.delete(ctx, phoneNumber, telegramID); err != nil {
-		return fmt.Errorf("delete by telegram id: %w", err)
+	if delErr := r.delete(ctx, phoneNumber, telegramID); delErr != nil {
+		return fmt.Errorf("delete by telegram id: %w", delErr)
 	}
 
 	return nil

@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 
@@ -25,9 +26,11 @@ func Module() fx.Option {
 						return fmt.Errorf("listen %s: %w", cfg.Address, err)
 					}
 					go func() {
-						if err := app.Listener(ln); err != nil {
-							logger.Error("server failed", zap.Error(err))
-							_ = sd.Shutdown()
+						if lsErr := app.Listener(ln); lsErr != nil && !errors.Is(lsErr, net.ErrClosed) {
+							logger.Error("server failed", zap.Error(lsErr))
+							if shErr := sd.Shutdown(); shErr != nil {
+								logger.Error("fx shutdown failed", zap.Error(shErr))
+							}
 						}
 					}()
 					logger.Info("server listening", zap.String("address", ln.Addr().String()))

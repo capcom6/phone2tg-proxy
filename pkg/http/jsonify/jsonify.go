@@ -23,7 +23,8 @@ func New() fiber.Handler {
 		if c.Response().StatusCode() < fiber.StatusBadRequest {
 			if err := c.JSON(body); err != nil {
 				// Fallback to string representation if JSON serialization fails
-				return c.Status(fiber.StatusInternalServerError).JSON(fmt.Sprintf("failed to jsonify response: %s", err.Error()))
+				return c.Status(fiber.StatusInternalServerError).
+					JSON(fmt.Sprintf("failed to jsonify response: %s", err.Error()))
 			}
 			return nil
 		}
