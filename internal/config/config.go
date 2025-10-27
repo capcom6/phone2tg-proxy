@@ -3,7 +3,7 @@ package config
 import (
 	"fmt"
 
-	"github.com/capcom6/phone2tg-proxy/pkg/config"
+	"github.com/go-core-fx/config"
 )
 
 type httpConfig struct {
