@@ -59,8 +59,8 @@ func (s *service) Store(ctx context.Context, phoneNumber string, telegramID int6
 		return fmt.Errorf("service: %w", err)
 	}
 
-	if err := s.r.Store(ctx, hashed, telegramID); err != nil {
-		return fmt.Errorf("service: %w", err)
+	if stErr := s.r.Store(ctx, hashed, telegramID); stErr != nil {
+		return fmt.Errorf("service: %w", stErr)
 	}
 
 	return nil

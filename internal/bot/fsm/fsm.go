@@ -40,8 +40,8 @@ func (f *Service) Get(key string) (*State, error) {
 		return NewState(StateEmpty), nil
 	}
 
-	if err := json.Unmarshal(b, state); err != nil {
-		return nil, fmt.Errorf("unmarshal state: %w", err)
+	if jsonErr := json.Unmarshal(b, state); jsonErr != nil {
+		return nil, fmt.Errorf("unmarshal state: %w", jsonErr)
 	}
 
 	if state.Data == nil {
@@ -57,8 +57,8 @@ func (f *Service) Set(key string, state *State) error {
 		return fmt.Errorf("marshal state: %w", err)
 	}
 
-	if err := f.storage.Set(f.prefix+key, b, f.exp); err != nil {
-		return fmt.Errorf("set state: %w", err)
+	if stErr := f.storage.Set(f.prefix+key, b, f.exp); stErr != nil {
+		return fmt.Errorf("set state: %w", stErr)
 	}
 
 	return nil

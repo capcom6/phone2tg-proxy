@@ -56,7 +56,7 @@ jobs:
           args: release --snapshot
 
       - name: Upload to S3
-        uses: capcom6/upload-s3-action@1aeafe98a046c148aceeef7c1889babb37da9b03
+        uses: capcom6/upload-s3-action@384aa15e46704fcbe8504212674c64a51f2f6425
         env:
           AWS_REGION: ${{ secrets.AWS_REGION }}
         with:
