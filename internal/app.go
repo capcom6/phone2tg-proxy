@@ -3,10 +3,10 @@ package internal
 import (
 	"github.com/capcom6/phone2tg-proxy/internal/bot"
 	"github.com/capcom6/phone2tg-proxy/internal/config"
+	"github.com/capcom6/phone2tg-proxy/internal/i18n"
 	"github.com/capcom6/phone2tg-proxy/internal/proxy"
 	"github.com/capcom6/phone2tg-proxy/internal/server"
 	"github.com/capcom6/phone2tg-proxy/internal/storage"
-	"github.com/capcom6/phone2tg-proxy/pkg/http"
 	"github.com/capcom6/phone2tg-proxy/pkg/logger"
 	"github.com/capcom6/phone2tg-proxy/pkg/redis"
 	"github.com/capcom6/phone2tg-proxy/pkg/telegram"
@@ -25,6 +25,8 @@ func Run() {
 			logOption.UseLogLevel(zapcore.DebugLevel)
 			return &logOption
 		}),
+		fiberfx.Module(),
+		//
 		config.Module(),
 		http.Module(),
 		telegram.Module(),
