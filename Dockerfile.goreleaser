@@ -12,5 +12,8 @@ WORKDIR /app
 # Copy the Pre-built binary file from GoReleaser
 COPY $TARGETPLATFORM/$BINARY_NAME ./app
 
+# Copy translation files for internationalization support
+COPY i18n/locales ./i18n/locales
+
 # Command to run the executable
 ENTRYPOINT ["/app/app"]

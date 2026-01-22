@@ -1,0 +1,10 @@
+{
+    "welcome_message": "Welcome to the contact bot!",
+    "send_contact": "Please, send me your contact",
+    "share_contact": "You must share your contact with me",
+    "invalid_phone": "Invalid phone number format. Please share your contact again.",
+    "thanks_contact": "Thanks for sharing your contact!",
+    "delete_failed": "Failed to delete association",
+    "delete_success": "Your association has been deleted",
+    "share_contact_button": "Share contact"
+}

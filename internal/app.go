@@ -11,6 +11,7 @@ import (
 	"github.com/capcom6/phone2tg-proxy/pkg/redis"
 	"github.com/capcom6/phone2tg-proxy/pkg/telegram"
 	"github.com/capcom6/phone2tg-proxy/pkg/validator"
+	"github.com/go-core-fx/fiberfx"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 	"go.uber.org/zap"
@@ -28,7 +29,6 @@ func Run() {
 		fiberfx.Module(),
 		//
 		config.Module(),
-		http.Module(),
 		telegram.Module(),
 		redis.Module(),
 		validator.Module(),
@@ -37,5 +37,6 @@ func Run() {
 		server.Module(),
 		bot.Module(),
 		proxy.Module(),
+		i18n.Module(),
 	).Run()
 }

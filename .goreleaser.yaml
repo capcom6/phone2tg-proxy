@@ -40,6 +40,8 @@ dockers_v2:
       - "v{{ .Major }}"
       - "v{{ .Major }}.{{ .Minor }}"
       - "latest"
+    extra_files:
+      - i18n/locales
     labels:
       "org.opencontainers.image.created": "{{ .Date }}"
       "org.opencontainers.image.title": "{{ .ProjectName }}"

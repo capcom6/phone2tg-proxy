@@ -33,6 +33,7 @@ A service that allows sending messages to Telegram users by specifying their pho
 - **Secure Storage**: Phone numbers are hashed for security
 - **Modular Architecture**: Well-structured components for maintainability
 - **Dependency Injection**: Using Uber FX for better testability
+- **Internationalization (i18n)**: Multi-language support with English and Russian translations
 
 ## Installation
 
@@ -95,14 +96,16 @@ The service can be configured using environment variables or a configuration fil
 
 ### Environment Variables
 
-| Variable             | Description                     | Default                    |
-| -------------------- | ------------------------------- | -------------------------- |
-| `HTTP__ADDRESS`      | HTTP server address             | `127.0.0.1:3000`           |
-| `HTTP__PROXY_HEADER` | HTTP proxy header               | `X-Forwarded-For`          |
-| `HTTP__PROXIES`      | HTTP trusted proxies            | empty                      |
-| `TELEGRAM__TOKEN`    | Your Telegram bot token         | Required                   |
-| `REDIS__URL`         | Redis connection URL            | `redis://localhost:6379/0` |
-| `STORAGE__SECRET`    | Secret for phone number hashing | Required                   |
+| Variable                  | Description                     | Default                    |
+| ------------------------- | ------------------------------- | -------------------------- |
+| `HTTP__ADDRESS`           | HTTP server address             | `127.0.0.1:3000`           |
+| `HTTP__PROXY_HEADER`      | HTTP proxy header               | `X-Forwarded-For`          |
+| `HTTP__PROXIES`           | HTTP trusted proxies            | empty                      |
+| `TELEGRAM__TOKEN`         | Your Telegram bot token         | Required                   |
+| `REDIS__URL`              | Redis connection URL            | `redis://localhost:6379/0` |
+| `STORAGE__SECRET`         | Secret for phone number hashing | Required                   |
+| `I18N__DEFAULT_LANGUAGE`  | Default language                | `en`                       |
+| `I18N__TRANSLATIONS_PATH` | Translations path               | `i18n/locales`             |
 
 ### Configuration File
 

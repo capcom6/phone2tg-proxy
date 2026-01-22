@@ -24,11 +24,17 @@ type storageConfig struct {
 	Secret string `koanf:"secret"`
 }
 
+type i18nConfig struct {
+	DefaultLanguage  string `koanf:"default_language"`
+	TranslationsPath string `koanf:"translations_path"`
+}
+
 type Config struct {
 	HTTP     httpConfig     `koanf:"http"`
 	Telegram telegramConfig `koanf:"telegram"`
 	Redis    redisConfig    `koanf:"redis"`
 	Storage  storageConfig  `koanf:"storage"`
+	I18n     i18nConfig     `koanf:"i18n"`
 }
 
 func New() (Config, error) {
@@ -46,6 +52,10 @@ func New() (Config, error) {
 		},
 		Storage: storageConfig{
 			Secret: "",
+		},
+		I18n: i18nConfig{
+			DefaultLanguage:  "en",
+			TranslationsPath: "i18n/locales",
 		},
 	}
 
