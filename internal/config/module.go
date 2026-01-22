@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/capcom6/phone2tg-proxy/internal/i18n"
 	"github.com/capcom6/phone2tg-proxy/internal/storage"
 	"github.com/capcom6/phone2tg-proxy/pkg/redis"
 	"github.com/capcom6/phone2tg-proxy/pkg/telegram"
@@ -37,6 +38,12 @@ func Module() fx.Option {
 		fx.Provide(func(cfg Config) storage.Config {
 			return storage.Config{
 				Secret: []byte(cfg.Storage.Secret),
+			}
+		}),
+		fx.Provide(func(cfg Config) i18n.Config {
+			return i18n.Config{
+				Language:         cfg.I18n.DefaultLanguage,
+				TranslationsPath: cfg.I18n.TranslationsPath,
 			}
 		}),
 	)
