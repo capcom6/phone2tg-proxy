@@ -6,7 +6,7 @@ require (
 	github.com/go-core-fx/config v0.0.0-20251027105846-1eb00d0ec829
 	github.com/go-core-fx/fiberfx v0.4.0
 	github.com/go-playground/validator/v10 v10.28.0
-	github.com/gofiber/fiber/v2 v2.52.9
+	github.com/gofiber/fiber/v2 v2.52.11
 	github.com/gofiber/storage/memory/v2 v2.1.0
 	github.com/redis/go-redis/v9 v9.12.1
 	github.com/swaggo/swag v1.16.6
