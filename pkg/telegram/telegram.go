@@ -3,8 +3,11 @@ package telegram
 import (
 	"errors"
 	"fmt"
+	"net/http"
+	"net/url"
 	"strings"
 
+	"golang.org/x/net/proxy"
 	"gopkg.in/telebot.v4"
 )
 
@@ -17,8 +20,14 @@ func New(cfg Config) (*telebot.Bot, error) {
 		return nil, ErrInvalidToken
 	}
 
+	h, err := newProxyClient(cfg.ProxyURL)
+	if err != nil {
+		return nil, err
+	}
+
 	pref := telebot.Settings{
-		Token: cfg.Token,
+		Token:  cfg.Token,
+		Client: h,
 	}
 
 	b, err := telebot.NewBot(pref)
@@ -27,4 +36,33 @@ func New(cfg Config) (*telebot.Bot, error) {
 	}
 
 	return b, nil
+}
+
+func newProxyClient(proxyURL string) (*http.Client, error) {
+	if proxyURL == "" {
+		return &http.Client{}, nil
+	}
+
+	u, err := url.Parse(proxyURL)
+	if err != nil {
+		return nil, fmt.Errorf("%w: failed to parse proxy URL: %w", ErrInvalidConfig, err)
+	}
+
+	dialer, err := proxy.FromURL(u, proxy.Direct)
+	if err != nil {
+		return nil, fmt.Errorf("%w: failed to create proxy dialer: %w", ErrInvalidConfig, err)
+	}
+
+	contextDialer, ok := dialer.(proxy.ContextDialer)
+	if !ok {
+		return nil, fmt.Errorf("%w: proxy dialer does not support context", ErrInvalidConfig)
+	}
+
+	transport := &http.Transport{
+		DialContext: contextDialer.DialContext,
+	}
+
+	return &http.Client{
+		Transport: transport,
+	}, nil
 }

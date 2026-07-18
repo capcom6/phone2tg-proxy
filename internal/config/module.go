@@ -26,7 +26,8 @@ func Module() fx.Option {
 			},
 			func(cfg Config) telegram.Config {
 				return telegram.Config{
-					Token: cfg.Telegram.Token,
+					Token:    cfg.Telegram.Token,
+					ProxyURL: cfg.Telegram.ProxyURL,
 				}
 			},
 		),
