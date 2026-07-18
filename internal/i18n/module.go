@@ -1,7 +1,7 @@
 package i18n
 
 import (
-	"github.com/capcom6/phone2tg-proxy/pkg/fxutil"
+	"github.com/go-core-fx/logger"
 	"go.uber.org/fx"
 )
 
@@ -9,7 +9,7 @@ import (
 func Module() fx.Option {
 	return fx.Module(
 		"i18n",
-		fxutil.WithNamedLogger("i18n"),
+		logger.WithNamedLogger("i18n"),
 		fx.Provide(
 			NewService,
 		),

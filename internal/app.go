@@ -7,11 +7,11 @@ import (
 	"github.com/capcom6/phone2tg-proxy/internal/proxy"
 	"github.com/capcom6/phone2tg-proxy/internal/server"
 	"github.com/capcom6/phone2tg-proxy/internal/storage"
-	"github.com/capcom6/phone2tg-proxy/pkg/logger"
-	"github.com/capcom6/phone2tg-proxy/pkg/redis"
 	"github.com/capcom6/phone2tg-proxy/pkg/telegram"
-	"github.com/capcom6/phone2tg-proxy/pkg/validator"
 	"github.com/go-core-fx/fiberfx"
+	"github.com/go-core-fx/logger"
+	"github.com/go-core-fx/redisfx"
+	"github.com/go-core-fx/validatorfx"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 	"go.uber.org/zap"
@@ -30,8 +30,8 @@ func Run() {
 		//
 		config.Module(),
 		telegram.Module(),
-		redis.Module(),
-		validator.Module(),
+		redisfx.Module(),
+		validatorfx.Module(),
 		//
 		storage.Module(),
 		server.Module(),

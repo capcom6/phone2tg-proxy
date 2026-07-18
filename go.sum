@@ -140,6 +140,12 @@ github.com/go-core-fx/fiberfx v0.5.1 h1:VyKY16wAGXF1LzPvY6uEKCe/pZY2FQ7arI6hLffi
 github.com/go-core-fx/fiberfx v0.5.1/go.mod h1:9MZcRCgYzqGLOpdnisW4+jQef8O9kcfaUKXAiAJZGTY=
 github.com/go-core-fx/fxutil v0.0.2 h1:T2uo4o3Gm4AltdI7ABdWkcX6zMhfpsylkPL208O7c88=
 github.com/go-core-fx/fxutil v0.0.2/go.mod h1:nljLWn+Ck1Rrqv9DPdD7Czdd0j5uF+9YRPNs/DpCfnw=
+github.com/go-core-fx/logger v0.0.1 h1:e3iJPEfV09fAZnVdROhcpDEbw7DHaNfY/OWCLX0wipA=
+github.com/go-core-fx/logger v0.0.1/go.mod h1:dvExTnpqUry/Qr0x0rg8UiKVUPv3PBb1JT/0llX5NWc=
+github.com/go-core-fx/redisfx v0.0.0-20251029094515-c9e3d82dfaa2 h1:sBOvVJ3HEOHTKLVhqzGwL15VGzAIoHDm4wPFOu7hRZs=
+github.com/go-core-fx/redisfx v0.0.0-20251029094515-c9e3d82dfaa2/go.mod h1:XUDPoiA2Z3BjbPVr0izYYUiq63nGxqsQNw/fhGWZqUk=
+github.com/go-core-fx/validatorfx v0.0.2 h1:J+POBsdqyT2Hd3TZHgJ+0eBtCPHhHff8TJLcGowQ0Ew=
+github.com/go-core-fx/validatorfx v0.0.2/go.mod h1:1VtQoOEzBo3oapXgRFA65H+zSKvmCvb6yfAcdwpqSlE=
 github.com/go-gl/glfw v0.0.0-20190409004039-e6da0acd62b1/go.mod h1:vR7hzQXu2zJy9AVAgeJqvqgH9Q5CA+iKCZ2gyEVpxRU=
 github.com/go-gl/glfw/v3.3/glfw v0.0.0-20191125211704-12ad95a8df72/go.mod h1:tQ2UAYgL5IevRw8kRxooKSPJfGvJ9fJQFa0TUsXzTg8=
 github.com/go-gl/glfw/v3.3/glfw v0.0.0-20200222043503-6f7a984d4dc4/go.mod h1:tQ2UAYgL5IevRw8kRxooKSPJfGvJ9fJQFa0TUsXzTg8=
@@ -635,6 +641,8 @@ golang.org/x/net v0.0.0-20220325170049-de3da57026de/go.mod h1:CfG3xpIq0wQ8r1q4Su
 golang.org/x/net v0.0.0-20220412020605-290c469a71a5/go.mod h1:CfG3xpIq0wQ8r1q4Su4UZFWDARRcnwPjda9FqA0JpMk=
 golang.org/x/net v0.0.0-20220425223048-2871e0cb64e4/go.mod h1:CfG3xpIq0wQ8r1q4Su4UZFWDARRcnwPjda9FqA0JpMk=
 golang.org/x/net v0.0.0-20220520000938-2e3eb7b945c2/go.mod h1:CfG3xpIq0wQ8r1q4Su4UZFWDARRcnwPjda9FqA0JpMk=
+golang.org/x/net v0.57.0 h1:K5+3DljvIuDG9/Jv9rvyMywYNFCQ9RSUY6OOTTkT+tE=
+golang.org/x/net v0.57.0/go.mod h1:KpXc8iv+r3XplLAG/f7Jsf9RPszJzdR0f58q9vGOuEU=
 golang.org/x/oauth2 v0.0.0-20180821212333-d2e6202438be/go.mod h1:N/0e6XlmueqKjAGxoOufVs8QHGRruUQn6yWY3a++T0U=
 golang.org/x/oauth2 v0.0.0-20190226205417-e64efc72b421/go.mod h1:gOpvHmFTYa4IltrdGE7lF6nIHvwfUNPOp7c8zoXwtLw=
 golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45/go.mod h1:gOpvHmFTYa4IltrdGE7lF6nIHvwfUNPOp7c8zoXwtLw=
