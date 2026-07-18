@@ -13,7 +13,8 @@ type httpConfig struct {
 }
 
 type telegramConfig struct {
-	Token string `koanf:"token"`
+	Token    string `koanf:"token"`
+	ProxyURL string `koanf:"proxy_url"`
 }
 
 type redisConfig struct {
@@ -45,7 +46,8 @@ func New() (Config, error) {
 			Proxies:     []string{},
 		},
 		Telegram: telegramConfig{
-			Token: "",
+			Token:    "",
+			ProxyURL: "",
 		},
 		Redis: redisConfig{
 			URL: "redis://localhost:6379/0",
