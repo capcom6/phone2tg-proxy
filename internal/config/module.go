@@ -3,9 +3,9 @@ package config
 import (
 	"github.com/capcom6/phone2tg-proxy/internal/i18n"
 	"github.com/capcom6/phone2tg-proxy/internal/storage"
-	"github.com/capcom6/phone2tg-proxy/pkg/redis"
 	"github.com/capcom6/phone2tg-proxy/pkg/telegram"
 	"github.com/go-core-fx/fiberfx"
+	"github.com/go-core-fx/redisfx"
 	"go.uber.org/fx"
 )
 
@@ -31,8 +31,8 @@ func Module() fx.Option {
 				}
 			},
 		),
-		fx.Provide(func(cfg Config) redis.Config {
-			return redis.Config{
+		fx.Provide(func(cfg Config) redisfx.Config {
+			return redisfx.Config{
 				URL: cfg.Redis.URL,
 			}
 		}),

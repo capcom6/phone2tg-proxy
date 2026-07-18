@@ -8,8 +8,8 @@ import (
 
 	"github.com/capcom6/phone2tg-proxy/internal/proxy"
 	"github.com/capcom6/phone2tg-proxy/pkg/client"
-	"github.com/capcom6/phone2tg-proxy/pkg/handler"
-	"github.com/capcom6/phone2tg-proxy/pkg/validator"
+	"github.com/go-core-fx/fiberfx/handler"
+	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/zap"
 )
@@ -18,6 +18,8 @@ type MessagesHandler struct {
 	handler.Base
 
 	proxySvc proxy.Service
+
+	logger *zap.Logger
 }
 
 func NewMessagesHandler(proxySvc proxy.Service, v *validator.Validate, logger *zap.Logger) *MessagesHandler {
@@ -26,8 +28,9 @@ func NewMessagesHandler(proxySvc proxy.Service, v *validator.Validate, logger *z
 
 		Base: handler.Base{
 			Validator: v,
-			Logger:    logger,
 		},
+
+		logger: logger,
 	}
 }
 

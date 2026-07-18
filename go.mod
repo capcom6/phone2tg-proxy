@@ -5,6 +5,9 @@ go 1.25.0
 require (
 	github.com/go-core-fx/config v0.1.0
 	github.com/go-core-fx/fiberfx v0.5.1
+	github.com/go-core-fx/logger v0.0.1
+	github.com/go-core-fx/redisfx v0.0.0-20251029094515-c9e3d82dfaa2
+	github.com/go-core-fx/validatorfx v0.0.2
 	github.com/go-playground/validator/v10 v10.30.3
 	github.com/gofiber/fiber/v2 v2.52.14
 	github.com/gofiber/storage/memory/v2 v2.1.2
@@ -12,6 +15,7 @@ require (
 	github.com/swaggo/swag v1.16.6
 	go.uber.org/fx v1.24.0
 	go.uber.org/zap v1.28.0
+	golang.org/x/net v0.57.0
 	gopkg.in/telebot.v4 v4.0.0-beta.10
 )
 

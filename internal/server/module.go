@@ -2,8 +2,8 @@ package server
 
 import (
 	"github.com/capcom6/phone2tg-proxy/internal/server/handlers"
-	"github.com/capcom6/phone2tg-proxy/pkg/fxutil"
 	"github.com/go-core-fx/fiberfx"
+	"github.com/go-core-fx/logger"
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -12,7 +12,7 @@ import (
 func Module() fx.Option {
 	return fx.Module(
 		"server",
-		fxutil.WithNamedLogger("server"),
+		logger.WithNamedLogger("server"),
 
 		fx.Provide(func(log *zap.Logger) fiberfx.Options {
 			opts := fiberfx.Options{}
