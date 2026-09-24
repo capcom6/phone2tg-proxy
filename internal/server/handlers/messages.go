@@ -58,10 +58,12 @@ func (h *MessagesHandler) post(c *fiber.Ctx) error {
 
 	id, err := h.proxySvc.Send(ctx, req.PhoneNumber, req.Text)
 	if errors.Is(err, proxy.ErrPhoneNumberNotFound) {
+		h.logger.Warn("phone number not found", zap.Error(err))
 		return fiber.NewError(fiber.StatusNotFound, "phone number not found")
 	}
 
 	if err != nil {
+		h.logger.Error("failed to send message", zap.Error(err))
 		return fiber.NewError(
 			fiber.StatusInternalServerError,
 			"failed to send message, please try again later or contact support",
