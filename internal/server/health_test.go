@@ -14,15 +14,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/capcom6/phone2tg-proxy/internal/proxy"
-	"github.com/capcom6/phone2tg-proxy/internal/server"
-	"github.com/go-core-fx/fiberfx"
 	"github.com/go-core-fx/fiberfx/health"
 	"github.com/go-core-fx/healthfx"
-	"github.com/go-core-fx/logger"
-	"github.com/go-core-fx/validatorfx"
 	"github.com/gofiber/fiber/v2"
-	"go.uber.org/fx"
 	"go.uber.org/zap/zaptest"
 )
 
@@ -50,59 +44,22 @@ func healthRoutePaths() []string {
 	return []string{routeHealth, routeHealthLive, routeHealthReady, routeHealthStartup}
 }
 
-// newWiredHealthApp builds the real server fx graph - the exact wiring
-// internal/app.go and internal/server/module.go register in production - and
-// returns the app with its routes already registered.
+// newWiredHealthApp returns the shared fiber app built once by TestMain.
 //
-// The graph is deliberately NOT started. fx runs every fx.Invoke while
-// constructing the graph, so the health routes are registered by the time fx.New
-// returns, and app.Test serves them without a bound listener. That is all these
-// tests need: they assert route registration and response contracts, neither of
-// which requires a listening socket. The Start -> Stop lifecycle over a bound
-// listener stays covered by TestAppBootSmoke.
+// The graph is the real production wiring (internal/app.go plus
+// internal/server/module.go), so these tests measure the routes production
+// registers rather than a hand-assembled substitute. It cannot be rebuilt per
+// test: server.Module() enables prometheus metrics, and fiberfx registers them
+// into the process-wide default registerer, so a second fiber app in the same
+// process panics. See TestMain for the full reasoning.
 func newWiredHealthApp(t *testing.T) *fiber.App {
 	t.Helper()
 
-	var app *fiber.App
-
-	fx.New(
-		logger.Module(),
-		logger.WithFxDefaultLogger(),
-
-		fiberfx.Module(),
-		fx.Provide(func() fiberfx.Config {
-			return fiberfx.Config{
-				Address:     "127.0.0.1:0",
-				ProxyHeader: "",
-				Proxies:     []string{},
-			}
-		}),
-
-		healthfx.Module(),
-		// Mirrors the internal/app.go provider verbatim, including ReleaseID 0.
-		fx.Provide(func() healthfx.Version {
-			return healthfx.Version{
-				Version:   "dev",
-				ReleaseID: 0,
-				BuildDate: "",
-				GitCommit: "",
-				GoVersion: "",
-			}
-		}),
-
-		validatorfx.Module(),
-		fx.Provide(func() proxy.Service { return stubProxy{} }),
-
-		server.Module(),
-
-		fx.Populate(&app),
-	)
-
-	if app == nil {
-		t.Fatal("fiber app was not populated")
+	if sharedApp == nil {
+		t.Fatal("shared fiber app was not populated; TestMain should have exited before this point")
 	}
 
-	return app
+	return sharedApp
 }
 
 // getHealth performs a GET against the fiber app and returns the status code
@@ -398,9 +355,14 @@ func TestHealthBodiesLeakNoSentinels(t *testing.T) {
 	}
 }
 
+// routeAPIBase is the prefix internal/server/module.go groups the public API
+// under. No handler is bound to the prefix itself: each creates its own
+// sub-group beneath it.
+const routeAPIBase = "/api/v1"
+
 // routeMessages is the only public API route, registered by
 // internal/server/module.go.
-const routeMessages = "/api/v1/messages"
+const routeMessages = routeAPIBase + "/messages"
 
 // postJSON posts body verbatim as application/json and returns the status code
 // plus the raw, undecoded response body.

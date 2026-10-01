@@ -472,6 +472,7 @@ linters:
           - err113
           - errcheck
           - funlen
+          - gochecknoglobals
           - goconst
           - gosec
           - noctx

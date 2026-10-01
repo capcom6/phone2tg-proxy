@@ -16,28 +16,19 @@ import (
 	"go.uber.org/fx"
 )
 
-func Run() {
+func Run(version healthfx.Version) {
 	fx.New(
 		logger.Module(),
 		logger.WithFxDefaultLogger(),
 		fiberfx.Module(),
 		healthfx.Module(),
-		// TODO(F-13): inject real version and build number at release time.
-		fx.Provide(func() healthfx.Version {
-			return healthfx.Version{
-				Version:   "dev",
-				ReleaseID: 0,
-				BuildDate: "",
-				GitCommit: "",
-				GoVersion: "",
-			}
-		}),
 		//
 		config.Module(),
 		telegram.Module(),
 		redisfx.Module(),
 		validatorfx.Module(),
 		//
+		fx.Supply(version),
 		storage.Module(),
 		server.Module(),
 		bot.Module(),

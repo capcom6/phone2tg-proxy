@@ -5,6 +5,7 @@ import (
 	"github.com/capcom6/phone2tg-proxy/internal/storage"
 	"github.com/capcom6/phone2tg-proxy/pkg/telegram"
 	"github.com/go-core-fx/fiberfx"
+	"github.com/go-core-fx/fiberfx/openapi"
 	"github.com/go-core-fx/redisfx"
 	"go.uber.org/fx"
 )
@@ -22,6 +23,13 @@ func Module() fx.Option {
 					Address:     cfg.HTTP.Address,
 					ProxyHeader: cfg.HTTP.ProxyHeader,
 					Proxies:     cfg.HTTP.Proxies,
+				}
+			},
+			func(cfg Config) openapi.Config {
+				return openapi.Config{
+					Enabled:    cfg.HTTP.OpenAPI.Enabled,
+					PublicHost: cfg.HTTP.OpenAPI.PublicHost,
+					PublicPath: cfg.HTTP.OpenAPI.PublicPath,
 				}
 			},
 			func(cfg Config) telegram.Config {

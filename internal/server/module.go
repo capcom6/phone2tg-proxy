@@ -1,9 +1,13 @@
 package server
 
 import (
+	"github.com/capcom6/phone2tg-proxy/internal/server/docs"
 	"github.com/capcom6/phone2tg-proxy/internal/server/handlers"
 	"github.com/go-core-fx/fiberfx"
+	"github.com/go-core-fx/fiberfx/handler"
 	"github.com/go-core-fx/fiberfx/health"
+	"github.com/go-core-fx/fiberfx/openapi"
+	"github.com/go-core-fx/fiberfx/validation"
 	"github.com/go-core-fx/logger"
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
@@ -17,25 +21,41 @@ func Module() fx.Option {
 
 		fx.Provide(func(log *zap.Logger) fiberfx.Options {
 			opts := fiberfx.Options{}
-			opts.WithErrorHandler(fiberfx.NewCustomJSONErrorHandler(log, errorsFormatter))
+			opts.WithErrorHandler(fiberfx.NewJSONErrorHandler(log))
+			opts.WithMetrics()
 			return opts
 		}),
+		fx.Supply(docs.SwaggerInfo),
 
 		fx.Provide(
-			handlers.NewMessagesHandler,
 			health.NewHandler,
+			openapi.NewHandler,
 			fx.Private,
 		),
 
-		fx.Invoke(func(app *fiber.App, messages *handlers.MessagesHandler) {
-			api := app.Group("/api/v1")
+		fx.Provide(
+			fx.Annotate(handlers.NewMessagesHandler, fx.ResultTags(`group:"handlers"`)),
+			fx.Private,
+		),
 
-			messages.Register(api.Group("/messages"))
-		}),
+		fx.Invoke(
+			fx.Annotate(
+				func(handlers []handler.Handler, healthHandler *health.Handler, openapiHandler *openapi.Handler, app *fiber.App) {
+					// Health endpoint
+					healthHandler.Register(app)
 
-		// Health routes are registered via Invoke, not a second fiberfx.Options provider.
-		fx.Invoke(func(app *fiber.App, health *health.Handler) {
-			health.Register(app)
-		}),
+					// Version 1 API group
+					v1 := app.Group("/api/v1")
+					openapiHandler.Register(v1.Group("/docs"))
+
+					v1.Use(validation.Middleware)
+
+					for _, h := range handlers {
+						h.Register(v1)
+					}
+				},
+				fx.ParamTags(`group:"handlers"`),
+			),
+		),
 	)
 }
