@@ -13,6 +13,7 @@ require (
 	github.com/gofiber/fiber/v2 v2.52.14
 	github.com/gofiber/storage/memory/v2 v2.1.2
 	github.com/redis/go-redis/v9 v9.21.0
+	github.com/samber/lo v1.52.0
 	github.com/swaggo/swag v1.16.6
 	go.uber.org/fx v1.24.0
 	go.uber.org/zap v1.28.0
@@ -44,6 +45,7 @@ require (
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/gofiber/contrib/fiberzap/v2 v2.1.6 // indirect
+	github.com/gofiber/swagger v1.1.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/klauspost/compress v1.19.0 // indirect
@@ -64,7 +66,7 @@ require (
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.70.0 // indirect
 	github.com/prometheus/procfs v0.21.1 // indirect
-	github.com/samber/lo v1.52.0 // indirect
+	github.com/swaggo/files/v2 v2.0.2 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.72.0 // indirect
 	go.opentelemetry.io/otel v1.44.0 // indirect
