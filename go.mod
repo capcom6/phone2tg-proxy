@@ -4,7 +4,8 @@ go 1.25.0
 
 require (
 	github.com/go-core-fx/config v0.1.0
-	github.com/go-core-fx/fiberfx v0.5.1
+	github.com/go-core-fx/fiberfx v0.6.0
+	github.com/go-core-fx/healthfx v0.1.0
 	github.com/go-core-fx/logger v0.0.1
 	github.com/go-core-fx/redisfx v0.0.0-20251029094515-c9e3d82dfaa2
 	github.com/go-core-fx/validatorfx v0.0.2
@@ -63,6 +64,7 @@ require (
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.70.0 // indirect
 	github.com/prometheus/procfs v0.21.1 // indirect
+	github.com/samber/lo v1.52.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.72.0 // indirect
 	go.opentelemetry.io/otel v1.44.0 // indirect

@@ -3,6 +3,7 @@ package server
 import (
 	"github.com/capcom6/phone2tg-proxy/internal/server/handlers"
 	"github.com/go-core-fx/fiberfx"
+	"github.com/go-core-fx/fiberfx/health"
 	"github.com/go-core-fx/logger"
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
@@ -22,6 +23,7 @@ func Module() fx.Option {
 
 		fx.Provide(
 			handlers.NewMessagesHandler,
+			health.NewHandler,
 			fx.Private,
 		),
 
@@ -29,6 +31,11 @@ func Module() fx.Option {
 			api := app.Group("/api/v1")
 
 			messages.Register(api.Group("/messages"))
+		}),
+
+		// Health routes are registered via Invoke, not a second fiberfx.Options provider.
+		fx.Invoke(func(app *fiber.App, health *health.Handler) {
+			health.Register(app)
 		}),
 	)
 }
