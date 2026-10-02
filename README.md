@@ -109,6 +109,17 @@ The service can be configured using environment variables or a configuration fil
 | `I18N__DEFAULT_LANGUAGE`  | Default language                | `en`                       |
 | `I18N__TRANSLATIONS_PATH` | Translations path               | `i18n/locales`             |
 
+Notes on `TELEGRAM__PROXY_URL` (behavior changes):
+
+- **Only `socks5://` and `socks5h://` URLs are accepted, and they are validated at startup.** A malformed SOCKS5
+  URL such as `socks5://` with no host, or an uppercase scheme such as `SOCKS5://host:1080`, is now rejected during
+  startup instead of failing later at dial time. An out-of-range port such as `socks5://127.0.0.1:99999` is still
+  accepted at startup. Leave the variable empty for no proxy.
+- **The Telegram HTTP client now owns a cloned transport.** With `TELEGRAM__PROXY_URL` empty the client is a clone
+  of the default transport rather than the shared default transport itself, so Telegram traffic no longer shares the
+  process-wide connection pool. This does **not** change proxy resolution: `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY`
+  were honoured before this change too, because the previous bare client also fell back to the default transport.
+
 ### Configuration File
 
 Create a `.env` file in the project root with your configuration:
