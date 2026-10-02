@@ -142,6 +142,8 @@ github.com/go-core-fx/fxutil v0.0.2 h1:T2uo4o3Gm4AltdI7ABdWkcX6zMhfpsylkPL208O7c
 github.com/go-core-fx/fxutil v0.0.2/go.mod h1:nljLWn+Ck1Rrqv9DPdD7Czdd0j5uF+9YRPNs/DpCfnw=
 github.com/go-core-fx/healthfx v0.1.0 h1:m/BkwnNTqxZPDNhgXApI3FwbhKnQDb9hd0R7s8mwYfw=
 github.com/go-core-fx/healthfx v0.1.0/go.mod h1:MxESD5T1NpBqcuVwn6bWHPqMdvhkzI+cKbJClftaRfI=
+github.com/go-core-fx/httpfx v0.2.0 h1:eeW/S5rH0Bd29q0pvAaXl3pExWOfrpa60Rf+1hcPvII=
+github.com/go-core-fx/httpfx v0.2.0/go.mod h1:CiPTnhEO2vrMbG7/QC5/N4xNEchh+VPoM8tRtSG65ts=
 github.com/go-core-fx/logger v0.0.1 h1:e3iJPEfV09fAZnVdROhcpDEbw7DHaNfY/OWCLX0wipA=
 github.com/go-core-fx/logger v0.0.1/go.mod h1:dvExTnpqUry/Qr0x0rg8UiKVUPv3PBb1JT/0llX5NWc=
 github.com/go-core-fx/redisfx v0.0.0-20251029094515-c9e3d82dfaa2 h1:sBOvVJ3HEOHTKLVhqzGwL15VGzAIoHDm4wPFOu7hRZs=
