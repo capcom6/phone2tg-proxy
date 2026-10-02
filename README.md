@@ -22,6 +22,7 @@ A service that allows sending messages to Telegram users by specifying their pho
   - [API Documentation](#api-documentation)
     - [Endpoints](#endpoints)
       - [Send Message](#send-message)
+      - [Health Endpoints](#health-endpoints)
   - [Contributing](#contributing)
   - [License](#license)
 
@@ -102,10 +103,22 @@ The service can be configured using environment variables or a configuration fil
 | `HTTP__PROXY_HEADER`      | HTTP proxy header               | `X-Forwarded-For`          |
 | `HTTP__PROXIES`           | HTTP trusted proxies            | empty                      |
 | `TELEGRAM__TOKEN`         | Your Telegram bot token         | Required                   |
+| `TELEGRAM__PROXY_URL`     | SOCKS5 proxy for Telegram       | empty                      |
 | `REDIS__URL`              | Redis connection URL            | `redis://localhost:6379/0` |
 | `STORAGE__SECRET`         | Secret for phone number hashing | Required                   |
 | `I18N__DEFAULT_LANGUAGE`  | Default language                | `en`                       |
 | `I18N__TRANSLATIONS_PATH` | Translations path               | `i18n/locales`             |
+
+Notes on `TELEGRAM__PROXY_URL` (behavior changes):
+
+- **Only `socks5://` and `socks5h://` URLs are accepted, and they are validated at startup.** A malformed SOCKS5
+  URL such as `socks5://` with no host, or an uppercase scheme such as `SOCKS5://host:1080`, is now rejected during
+  startup instead of failing later at dial time. An out-of-range port such as `socks5://127.0.0.1:99999` is still
+  accepted at startup. Leave the variable empty for no proxy.
+- **The Telegram HTTP client now owns a cloned transport.** With `TELEGRAM__PROXY_URL` empty the client is a clone
+  of the default transport rather than the shared default transport itself, so Telegram traffic no longer shares the
+  process-wide connection pool. This does **not** change proxy resolution: `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY`
+  were honoured before this change too, because the previous bare client also fell back to the default transport.
 
 ### Configuration File
 
@@ -158,6 +171,50 @@ The service provides a REST API for sending messages.
   - `400 Bad Request`: Invalid request format
   - `404 Not Found`: Phone number not found
   - `500 Internal Server Error`: Server error
+
+#### Health Endpoints
+
+The service exposes four probe endpoints for orchestrators and load balancers. All of them return the same
+envelope and never include configuration values, tokens, secrets, or phone numbers.
+
+- **URLs**: all four are `GET`:
+  - `GET /health` - liveness probe
+  - `GET /health/live` - liveness probe
+  - `GET /health/ready` - readiness probe
+  - `GET /health/startup` - startup probe
+- **Status code contract**: `200 OK` unless the overall status is `fail`, in which case
+  `503 Service Unavailable`. A `warn` overall status is still `200 OK`.
+- **Response**:
+  ```json
+  {
+    "status": "pass",
+    "version": "dev",
+    "checks": {
+      "system:goroutines": {
+        "description": "Number of goroutines",
+        "observedUnit": "goroutines",
+        "observedValue": 5,
+        "status": "pass"
+      }
+    }
+  }
+  ```
+- **Response keys**: top level is limited to `status`, `version`, `releaseId`, and `checks`; each entry under
+  `checks` is limited to `description`, `observedUnit`, `observedValue`, and `status`. Both `releaseId` and
+  `checks` are omitted when empty.
+
+Notes on the current build:
+
+- **`version` is always `dev` and `releaseId` is always absent.** The release linker flags in
+  `.goreleaser.yaml` are `-s -w` only, so no version or build number is injected at compile time. A real
+  version has to be injected before release builds can report one.
+- **`/health` and `/health/live` carry the `system:goroutines` and `system:memory` checks.** The built-in
+  provider escalates to `warn` above 100 goroutines or 128 MiB of allocated heap. Because `warn` maps to
+  `200 OK`, a small container under load shows `warn` in the body without affecting availability.
+- **`/health/ready` and `/health/startup` currently report no checks at all** and therefore always answer
+  `200 OK` with no `checks` object: no provider is registered for readiness or startup. Likewise, no
+  provider reports `fail`, so `503` is currently unreachable. Registering a provider that reports `fail` is
+  what makes these probes gate traffic.
 
 ## Contributing
 

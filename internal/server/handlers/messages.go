@@ -22,7 +22,10 @@ type MessagesHandler struct {
 	logger *zap.Logger
 }
 
-func NewMessagesHandler(proxySvc proxy.Service, v *validator.Validate, logger *zap.Logger) *MessagesHandler {
+// NewMessagesHandler builds the messages handler.
+//
+// It returns the handler.Handler interface, not *MessagesHandler: internal/server/module.go consumes the value as a []handler.Handler dig group, and a value group is keyed by the EXACT result type. A concrete result therefore resolves to an EMPTY slice - silently, with no dig error - and the route is never registered.
+func NewMessagesHandler(proxySvc proxy.Service, v *validator.Validate, logger *zap.Logger) handler.Handler {
 	return &MessagesHandler{
 		proxySvc: proxySvc,
 
@@ -76,5 +79,7 @@ func (h *MessagesHandler) post(c *fiber.Ctx) error {
 }
 
 func (h *MessagesHandler) Register(r fiber.Router) {
-	r.Post("", h.post)
+	g := r.Group("/messages")
+
+	g.Post("", h.post)
 }

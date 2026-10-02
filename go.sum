@@ -136,10 +136,14 @@ github.com/gabriel-vasile/mimetype v1.4.13/go.mod h1:d+9Oxyo1wTzWdyVUPMmXFvp4F9t
 github.com/ghodss/yaml v1.0.0/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
 github.com/go-core-fx/config v0.1.0 h1:uKmo+mTt5a8Gtusb7Xf4gkrGcLIbm2doTEUMkdd6oGo=
 github.com/go-core-fx/config v0.1.0/go.mod h1:gvoLaHr5fHfG5DlYYtNSPTqRlbnxWMqiWL4iWy2oezY=
-github.com/go-core-fx/fiberfx v0.5.1 h1:VyKY16wAGXF1LzPvY6uEKCe/pZY2FQ7arI6hLffi0m0=
-github.com/go-core-fx/fiberfx v0.5.1/go.mod h1:9MZcRCgYzqGLOpdnisW4+jQef8O9kcfaUKXAiAJZGTY=
+github.com/go-core-fx/fiberfx v0.6.0 h1:/etL9QXCr0gfQOXLZSjWnAuj3uwmhm3J5fiKGg27rB4=
+github.com/go-core-fx/fiberfx v0.6.0/go.mod h1:9MZcRCgYzqGLOpdnisW4+jQef8O9kcfaUKXAiAJZGTY=
 github.com/go-core-fx/fxutil v0.0.2 h1:T2uo4o3Gm4AltdI7ABdWkcX6zMhfpsylkPL208O7c88=
 github.com/go-core-fx/fxutil v0.0.2/go.mod h1:nljLWn+Ck1Rrqv9DPdD7Czdd0j5uF+9YRPNs/DpCfnw=
+github.com/go-core-fx/healthfx v0.1.0 h1:m/BkwnNTqxZPDNhgXApI3FwbhKnQDb9hd0R7s8mwYfw=
+github.com/go-core-fx/healthfx v0.1.0/go.mod h1:MxESD5T1NpBqcuVwn6bWHPqMdvhkzI+cKbJClftaRfI=
+github.com/go-core-fx/httpfx v0.2.0 h1:eeW/S5rH0Bd29q0pvAaXl3pExWOfrpa60Rf+1hcPvII=
+github.com/go-core-fx/httpfx v0.2.0/go.mod h1:CiPTnhEO2vrMbG7/QC5/N4xNEchh+VPoM8tRtSG65ts=
 github.com/go-core-fx/logger v0.0.1 h1:e3iJPEfV09fAZnVdROhcpDEbw7DHaNfY/OWCLX0wipA=
 github.com/go-core-fx/logger v0.0.1/go.mod h1:dvExTnpqUry/Qr0x0rg8UiKVUPv3PBb1JT/0llX5NWc=
 github.com/go-core-fx/redisfx v0.0.0-20251029094515-c9e3d82dfaa2 h1:sBOvVJ3HEOHTKLVhqzGwL15VGzAIoHDm4wPFOu7hRZs=
@@ -209,6 +213,8 @@ github.com/gofiber/fiber/v2 v2.52.14 h1:Of3L+9qVFaQNwPlcmEdl5IIodHz8BSE0j37R7rWu
 github.com/gofiber/fiber/v2 v2.52.14/go.mod h1:YEcBbO/FB+5M1IZNBP9FO3J9281zgPAreiI1oqg8nDw=
 github.com/gofiber/storage/memory/v2 v2.1.2 h1:IGOMSgnlCv/Dh1rkXA9G69kHIAywUqPjaGFUR5XATE0=
 github.com/gofiber/storage/memory/v2 v2.1.2/go.mod h1:R3dBncEPAGt83cQleHFXdT/t7Pep6+5ED0rBfJSqjJg=
+github.com/gofiber/swagger v1.1.1 h1:FZVhVQQ9s1ZKLHL/O0loLh49bYB5l1HEAgxDlcTtkRA=
+github.com/gofiber/swagger v1.1.1/go.mod h1:vtvY/sQAMc/lGTUCg0lqmBL7Ht9O7uzChpbvJeJQINw=
 github.com/gogo/protobuf v1.1.1/go.mod h1:r8qH/GZQm5c6nD/R0oafs1akxWv10x8SbQlK7atdtwQ=
 github.com/gogo/protobuf v1.3.2/go.mod h1:P1XiOD3dCwIKUDQYPy72D8LYyHL2YPYrpS2s69NZV8Q=
 github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b/go.mod h1:SBH7ygxi8pfUlaOkMMuAQtPIUF8ecWP5IEl/CR7VP2Q=
@@ -461,6 +467,8 @@ github.com/rogpeppe/go-internal v1.6.1 h1:/FiVV8dS/e+YqF2JvO3yXRFbBLTIuSDkuC7aBO
 github.com/rogpeppe/go-internal v1.6.1/go.mod h1:xXDCJY+GAPziupqXw64V24skbSoqbTEfhy4qGm1nDQc=
 github.com/ryanuber/columnize v0.0.0-20160712163229-9b3edd62028f/go.mod h1:sm1tb6uqfes/u+d4ooFouqFdy9/2g9QGwK3SQygK0Ts=
 github.com/sagikazarmark/crypt v0.6.0/go.mod h1:U8+INwJo3nBv1m6A/8OBXAq7Jnpspk5AxSgDyEQcea8=
+github.com/samber/lo v1.52.0 h1:Rvi+3BFHES3A8meP33VPAxiBZX/Aws5RxrschYGjomw=
+github.com/samber/lo v1.52.0/go.mod h1:4+MXEGsJzbKGaUEQFKBq2xtfuznW9oz/WrgyzMzRoM0=
 github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529/go.mod h1:DxrIzT+xaE7yg65j358z/aeFdxmN0P9QXhEzd20vsDc=
 github.com/sirupsen/logrus v1.2.0/go.mod h1:LxeOpSwHxABJmUn/MG1IvRgCAasNZTLOkJPxbbu5VWo=
 github.com/sirupsen/logrus v1.4.2/go.mod h1:tLMulIdttU9McNUspp0xgXVQah82FyeX6MwdIuYE2rE=
@@ -486,6 +494,8 @@ github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
 github.com/subosito/gotenv v1.4.1/go.mod h1:ayKnFf/c6rvx/2iiLrJUk1e6plDbT3edrFNGqEflhK0=
+github.com/swaggo/files/v2 v2.0.2 h1:Bq4tgS/yxLB/3nwOMcul5oLEUKa877Ykgz3CJMVbQKU=
+github.com/swaggo/files/v2 v2.0.2/go.mod h1:TVqetIzZsO9OhHX1Am9sRf9LdrFZqoK49N37KON/jr0=
 github.com/swaggo/swag v1.16.6 h1:qBNcx53ZaX+M5dxVyTrgQ0PJ/ACK+NzhwcbieTt+9yI=
 github.com/swaggo/swag v1.16.6/go.mod h1:ngP2etMK5a0P3QBizic5MEwpRmluJZPHjXcMoj4Xesg=
 github.com/tv42/httpunix v0.0.0-20150427012821-b75d8614f926/go.mod h1:9ESjWnEqriFuLhtthL60Sar/7RFoluCcXsuvEwTV5KM=

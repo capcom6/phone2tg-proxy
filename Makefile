@@ -1,11 +1,18 @@
-.PHONY: all fmt lint test coverage benchmark deps air run api-docs release clean help
+.PHONY: all version fmt lint test coverage benchmark air deps gen release clean build help
 
-all: fmt lint test benchmark ## Run all tests and checks
+BINARY_NAME := $(shell basename $(PWD))
+GIT_VERSION := $(shell git describe --tags --abbrev=0 2>/dev/null || echo "0.0.0")
+VERSION ?= $(GIT_VERSION)
 
-fmt: ## Format the code
+all: fmt lint coverage ## Run all tests and checks
+
+version: ## Display current version
+	@echo "Current version: $(VERSION)"
+
+fmt: gen ## Format code
 	golangci-lint fmt
 
-lint: ## Lint the code
+lint: ## Run linter
 	golangci-lint run --timeout=5m
 
 test: ## Run tests
@@ -18,33 +25,35 @@ coverage: test ## Generate coverage
 benchmark: ## Run benchmarks
 	go test -run=^$$ -bench=. -benchmem ./... | tee benchmark.txt
 
+air: ## Run development server
+	@command -v air >/dev/null 2>&1 || { \
+      echo "Please install air: go install github.com/air-verse/air@latest"; \
+      exit 1; \
+    }
+	@echo "Starting development server with air..."
+	TZ=UTC DEBUG=1 air
+
 deps: ## Install dependencies
 	go mod download
-	go install github.com/cosmtrek/air@latest
-	go install github.com/swaggo/swag/cmd/swag@latest
 
-air: ## Run Air live-reload
-	air -c .air.toml
-
-run: ## Run the app in Docker
-	docker compose up --build
-
-api-docs: ## Generate API docs
-	@if ! swag fmt -g ./main.go; then \
-		echo "Error: Failed to format API docs"; \
-		exit 1; \
-	fi
-	@if ! swag init --parseDependency -g ./main.go -o ./api; then \
-		echo "Error: Failed to generate API docs"; \
-		exit 1; \
-	fi
+gen: ## Generate code
+	go generate ./...
 
 release: ## Create release
 	goreleaser release --snapshot --clean
 
-clean: ## Remove build artifacts
+clean: ## Clean build artifacts
 	rm -f coverage.* benchmark.txt
-	rm -rf dist
+	rm -rf dist bin
 
-help: ## Show this help
+build: ## Build the project
+	@echo "Building the project..."
+	@mkdir -p bin
+	go build -o bin/$(BINARY_NAME) .
+
+help: ## Show help
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+# Use the wildcard function to expand the pattern to a list of existing files
+# and then include that list of files.
+include $(wildcard *.mk)
