@@ -10,6 +10,7 @@ import (
 	"github.com/capcom6/phone2tg-proxy/pkg/telegram"
 	"github.com/go-core-fx/fiberfx"
 	"github.com/go-core-fx/healthfx"
+	"github.com/go-core-fx/httpfx"
 	"github.com/go-core-fx/logger"
 	"github.com/go-core-fx/redisfx"
 	"github.com/go-core-fx/validatorfx"
@@ -22,6 +23,7 @@ func Run(version healthfx.Version) {
 		logger.WithFxDefaultLogger(),
 		fiberfx.Module(),
 		healthfx.Module(),
+		httpfx.Module(),
 		//
 		config.Module(),
 		telegram.Module(),

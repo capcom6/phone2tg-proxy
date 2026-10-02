@@ -6,6 +6,7 @@ require (
 	github.com/go-core-fx/config v0.1.0
 	github.com/go-core-fx/fiberfx v0.6.0
 	github.com/go-core-fx/healthfx v0.1.0
+	github.com/go-core-fx/httpfx v0.2.0
 	github.com/go-core-fx/logger v0.0.1
 	github.com/go-core-fx/redisfx v0.0.0-20251029094515-c9e3d82dfaa2
 	github.com/go-core-fx/validatorfx v0.0.2
@@ -17,7 +18,6 @@ require (
 	github.com/swaggo/swag v1.16.6
 	go.uber.org/fx v1.24.0
 	go.uber.org/zap v1.28.0
-	golang.org/x/net v0.57.0
 	gopkg.in/telebot.v4 v4.0.0-beta.10
 )
 
@@ -77,6 +77,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.54.0 // indirect
 	golang.org/x/mod v0.38.0 // indirect
+	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
