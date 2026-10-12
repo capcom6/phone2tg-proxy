@@ -7,8 +7,9 @@ import (
 	"strings"
 
 	"github.com/capcom6/phone2tg-proxy/internal/storage"
+	"github.com/go-core-fx/telegofx"
+	"github.com/mymmrac/telego"
 	"go.uber.org/zap"
-	"gopkg.in/telebot.v4"
 )
 
 var (
@@ -21,12 +22,12 @@ type Service interface {
 
 type service struct {
 	storage storage.Service
-	bot     *telebot.Bot
+	bot     *telegofx.Bot
 
 	logger *zap.Logger
 }
 
-func New(storage storage.Service, bot *telebot.Bot, logger *zap.Logger) Service {
+func New(storage storage.Service, bot *telegofx.Bot, logger *zap.Logger) Service {
 	return &service{
 		storage: storage,
 		bot:     bot,
@@ -45,13 +46,18 @@ func (s *service) Send(ctx context.Context, phoneNumber string, message string) 
 		return 0, fmt.Errorf("send: %w", err)
 	}
 
-	msg, err := s.bot.Send(telebot.ChatID(telegramID), message)
+	// OD-B: context.Background() preserves the unbounded Telegram call; the
+	// caller's context bounds only the storage lookup above.
+	msg, err := s.bot.SendMessage(context.Background(), &telego.SendMessageParams{
+		ChatID: telego.ChatID{ID: telegramID},
+		Text:   message,
+	})
 	if err != nil {
 		s.logger.Error("send", zap.String("phone_number", maskPhoneNumber(phoneNumber)), zap.Error(err))
 		return 0, fmt.Errorf("send: %w", err)
 	}
 
-	return msg.ID, nil
+	return msg.MessageID, nil
 }
 
 const digitsToKeep = 4

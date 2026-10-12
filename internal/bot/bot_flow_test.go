@@ -1,11 +1,15 @@
 package bot_test
 
 // bot_flow_test.go is the pre-swap oracle: it pins the bot's user-facing
-// contract on the CURRENT gopkg.in/telebot.v4 implementation so the telego
-// migration (T3) can be verified to delete or relax NO assertion. Every reply
-// assertion compares against a LITERAL string from i18n/locales/en.json.
-// Never call i18n.Service.Translate in an assertion: it returns the key on
-// miss and would self-fulfill.
+// contract so the binder migration (T3) can be verified to delete or relax
+// NO assertion. Every reply assertion compares against a LITERAL string from
+// i18n/locales/en.json. Never call i18n.Service.Translate in an assertion:
+// it returns the key on miss and would self-fulfill.
+//
+// T3 re-points the drive side from the old ProcessUpdate cascade to
+// telegohandler's synchronous HandleUpdate: one update runs inline through
+// the real middleware, predicates and dispatcher, with no Start()/channel
+// wait anywhere. The 12 assertion IDs and their literals are unchanged.
 
 import (
 	"context"
@@ -22,13 +26,15 @@ import (
 
 	"github.com/capcom6/phone2tg-proxy/internal/bot/fsm"
 	"github.com/capcom6/phone2tg-proxy/internal/bot/handlers"
-	"github.com/capcom6/phone2tg-proxy/internal/bot/middleware"
+	"github.com/capcom6/phone2tg-proxy/internal/bot/handlers/start"
+	"github.com/capcom6/phone2tg-proxy/internal/bot/handlers/stop"
 	"github.com/capcom6/phone2tg-proxy/internal/bot/router"
 	"github.com/capcom6/phone2tg-proxy/internal/i18n"
 	"github.com/capcom6/phone2tg-proxy/internal/storage"
+	"github.com/go-core-fx/telegofx"
 	"github.com/gofiber/storage/memory/v2"
+	"github.com/mymmrac/telego"
 	"go.uber.org/zap"
-	"gopkg.in/telebot.v4"
 )
 
 // ---------------------------------------------------------------------------
@@ -69,7 +75,7 @@ type tgCall struct {
 }
 
 // recordingTransport implements http.RoundTripper. It records every request
-// telebot makes (method + JSON body) and answers {"ok":true} so Raw() never
+// the bot makes (method + JSON body) and answers {"ok":true} so Raw() never
 // errors. No packet leaves the process.
 type recordingTransport struct {
 	mu    sync.Mutex
@@ -143,6 +149,8 @@ func (rt *recordingTransport) texts(method string) []string {
 
 // replyMarkup returns the decoded reply_markup of the n-th captured call of a
 // method. The n-th call is used because handler order is deterministic.
+// telego posts the markup as a JSON object in the request body, so the raw
+// parameter arrives already decoded from the transport's JSON unmarshal.
 func (rt *recordingTransport) replyMarkup(t *testing.T, method string, n int) map[string]any {
 	t.Helper()
 
@@ -156,16 +164,19 @@ func (rt *recordingTransport) replyMarkup(t *testing.T, method string, n int) ma
 		t.Fatalf("%s call %d carries no reply_markup", method, n)
 	}
 
-	str, ok := raw.(string)
-	if !ok {
-		t.Fatalf("%s call %d reply_markup must be a string, got %T", method, n, raw)
+	switch markup := raw.(type) {
+	case map[string]any:
+		return markup
+	case string:
+		var decoded map[string]any
+		if err := json.Unmarshal([]byte(markup), &decoded); err != nil {
+			t.Fatalf("unmarshal reply_markup: %v", err)
+		}
+		return decoded
+	default:
+		t.Fatalf("%s call %d reply_markup must be a JSON object, got %T", method, n, raw)
+		return nil
 	}
-
-	var markup map[string]any
-	if err := json.Unmarshal([]byte(str), &markup); err != nil {
-		t.Fatalf("unmarshal reply_markup: %v", err)
-	}
-	return markup
 }
 
 // ---------------------------------------------------------------------------
@@ -232,24 +243,29 @@ func (f *fakeStorage) deleteCalls() []int64 {
 }
 
 // ---------------------------------------------------------------------------
-// Harness: real telebot bot + real middleware + real router + real handlers.
+// Harness: real telego bot + real middleware + real router + real handlers.
 // ---------------------------------------------------------------------------
 
 const (
 	chatIDPrivate = int64(100200300)
 	chatIDGroup   = int64(-1009876543210)
 	otherUserID   = int64(777888999)
-	botID         = int64(424242)
 	ownBotName    = "own_test_bot"
 	otherBotName  = "OtherBot"
+
+	// offlineToken satisfies telego's ^\d+:[\w-]{35}$ gate. telego performs
+	// no network call at construction under OD-C=a, so the token only has to
+	// be format-valid; the HTTP client below answers everything locally.
+	offlineToken = "123456:AAE-characterization-token-not-real"
 )
 
 // flowHarness wires the exact production graph from internal/bot/module.go:
-// middleware.Logger -> router.New(fsm, bot) -> handlers, but with an offline
-// telebot bot whose HTTP client records every call.
+// router.New(fsm, rt, username) -> the start/stop handlers registering on the
+// seam, but with an offline telego bot whose HTTP client records every call.
 type flowHarness struct {
 	t          *testing.T
-	bot        *telebot.Bot
+	bot        *telegofx.Bot
+	router     *telegofx.Router
 	transport  *recordingTransport
 	storage    *fakeStorage
 	fsmService *fsm.Service
@@ -270,40 +286,53 @@ func newFlowHarness(t *testing.T) *flowHarness {
 		deleteErr: nil,
 	}
 
-	b, err := telebot.NewBot(telebot.Settings{
-		Token:       "123456:test-offline-token-not-real",
-		Offline:     true, // skips getMe; no network
-		Synchronous: true, // ProcessUpdate runs handlers inline
-		Client:      &http.Client{Transport: transport},
-	})
+	cfg := telegofx.Config{
+		Token:    offlineToken,
+		Mode:     telegofx.ModePolling,
+		ProxyURL: "",
+	}
+
+	// telegofx.New validates the token format only: no getMe, no polling
+	// (OD-C=a). Every API call the suite observes goes through the recording
+	// transport.
+	b, err := telegofx.New(
+		cfg,
+		[]telego.BotOption{telego.WithHTTPClient(&http.Client{Transport: transport})},
+		zap.NewNop(),
+	)
 	if err != nil {
 		t.Fatalf("new bot: %v", err)
 	}
 
-	// telebot drops any /cmd@suffix whose botname is not EqualFold(b.Me
-	// .Username). Offline leaves Me empty, so seed it for CM2/CM3.
-	b.Me = &telebot.User{ID: botID, Username: ownBotName}
+	rt, err := telegofx.NewRouter(cfg, b)
+	if err != nil {
+		t.Fatalf("new router: %v", err)
+	}
 
 	logger := zap.NewNop()
 	fsmStorage := memory.New()
 	fsmService := fsm.New("fsm", 0, fsmStorage)
 
-	b.Use(middleware.Logger(logger))
+	// Registration order mirrors internal/bot/module.go: the routes register
+	// through the shared seam in handler registration order, so the command
+	// endpoints land before the plain-text fall-through. The username
+	// provider is a plain function so CM2/CM3 resolve without a network call.
+	r := router.New(fsmService, rt, func() string { return ownBotName })
 
-	rt := router.New(fsmService, b)
-	startHandler := handlers.NewStartHandler(st, newTestTranslator(t))
-	stopHandler := handlers.NewStopHandler(st, logger, newTestTranslator(t))
+	startHandler := start.New(st, newTestTranslator(t))
+	stopHandler := stop.New(st, logger, newTestTranslator(t))
 
-	if regErr := startHandler.Register(rt); regErr != nil {
+	if regErr := startHandler.Register(r); regErr != nil {
 		t.Fatalf("register start handler: %v", regErr)
 	}
-	if regErr := stopHandler.Register(rt); regErr != nil {
+	if regErr := stopHandler.Register(r); regErr != nil {
 		t.Fatalf("register stop handler: %v", regErr)
 	}
 
 	return &flowHarness{
 		t:          t,
 		bot:        b,
+		router:     rt,
 		transport:  transport,
 		storage:    st,
 		fsmService: fsmService,
@@ -346,44 +375,48 @@ func (h *flowHarness) getState(chatID int64) fsm.StateName {
 	return st.Name
 }
 
-// send drives exactly one update through the real dispatch cascade.
-func (h *flowHarness) send(u telebot.Update) {
+// send drives exactly one update through the real dispatch cascade,
+// synchronously: HandleUpdate runs middleware, predicates and the dispatcher
+// inline before returning.
+func (h *flowHarness) send(u telego.Update) {
 	h.t.Helper()
 
 	h.transport.reset()
-	h.bot.ProcessUpdate(u)
+	if err := h.router.BaseGroup().HandleUpdate(context.Background(), h.bot.Bot, u); err != nil {
+		h.t.Fatalf("handle update: %v", err)
+	}
 }
 
 // privateMessage builds a private-chat text message update for chatIDPrivate.
-func privateMessage(id int, text string) telebot.Update {
-	return telebot.Update{
-		ID: id,
-		Message: &telebot.Message{
-			ID:     id,
-			Chat:   &telebot.Chat{ID: chatIDPrivate},
-			Sender: &telebot.User{ID: chatIDPrivate},
-			Text:   text,
+func privateMessage(id int, text string) telego.Update {
+	return telego.Update{
+		UpdateID: id,
+		Message: &telego.Message{
+			MessageID: id,
+			Chat:      telego.Chat{ID: chatIDPrivate, Type: telego.ChatTypePrivate},
+			From:      &telego.User{ID: chatIDPrivate},
+			Text:      text,
 		},
 	}
 }
 
 // groupMessage builds a group-chat text message update (used by SC-4, whose
 // body is pinned post-migration).
-func groupMessage(id int, chatID int64, text string) telebot.Update {
-	return telebot.Update{
-		ID: id,
-		Message: &telebot.Message{
-			ID:     id,
-			Chat:   &telebot.Chat{ID: chatID},
-			Sender: &telebot.User{ID: otherUserID},
-			Text:   text,
+func groupMessage(id int, chatID int64, text string) telego.Update {
+	return telego.Update{
+		UpdateID: id,
+		Message: &telego.Message{
+			MessageID: id,
+			Chat:      telego.Chat{ID: chatID, Type: telego.ChatTypeGroup},
+			From:      &telego.User{ID: otherUserID},
+			Text:      text,
 		},
 	}
 }
 
 // contactMessage builds a contact update for chatIDPrivate; sameUser selects
 // the chat owner as the contact's user (the SC-2 ownership polarity).
-func contactMessage(id int, sameUser bool, phone string) telebot.Update {
+func contactMessage(id int, sameUser bool, phone string) telego.Update {
 	chatID := chatIDPrivate
 
 	contactUserID := chatID
@@ -391,13 +424,13 @@ func contactMessage(id int, sameUser bool, phone string) telebot.Update {
 		contactUserID = otherUserID
 	}
 
-	return telebot.Update{
-		ID: id,
-		Message: &telebot.Message{
-			ID:      id,
-			Chat:    &telebot.Chat{ID: chatID},
-			Sender:  &telebot.User{ID: chatID},
-			Contact: &telebot.Contact{UserID: contactUserID, PhoneNumber: phone},
+	return telego.Update{
+		UpdateID: id,
+		Message: &telego.Message{
+			MessageID: id,
+			Chat:      telego.Chat{ID: chatID, Type: telego.ChatTypePrivate},
+			From:      &telego.User{ID: chatID},
+			Contact:   &telego.Contact{UserID: contactUserID, PhoneNumber: phone},
 		},
 	}
 }
@@ -519,34 +552,37 @@ func TestBotFlow_SC2_invalid_phone_keeps_state(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // SC3_update_narrowing: edited_message, channel_post and callback_query
-// updates create no FSM state (telebot dispatches them to OnEdited /
-// OnChannelPost / OnCallback, none of which is registered).
+// updates create no FSM state (the dispatcher only routes updates whose
+// update.Message is set; nothing keys FSM state off the other fields).
 func TestBotFlow_SC3_update_narrowing(t *testing.T) {
 	h := newFlowHarness(t)
 
-	updates := []telebot.Update{
+	updates := []telego.Update{
 		{
-			ID: 6,
-			EditedMessage: &telebot.Message{
-				ID:   6,
-				Chat: &telebot.Chat{ID: chatIDPrivate},
-				Text: "/start",
+			UpdateID: 6,
+			EditedMessage: &telego.Message{
+				MessageID: 6,
+				Chat:      telego.Chat{ID: chatIDPrivate, Type: telego.ChatTypePrivate},
+				Text:      "/start",
 			},
 		},
 		{
-			ID: 7,
-			ChannelPost: &telebot.Message{
-				ID:   7,
-				Chat: &telebot.Chat{ID: chatIDGroup},
-				Text: "/start",
+			UpdateID: 7,
+			ChannelPost: &telego.Message{
+				MessageID: 7,
+				Chat:      telego.Chat{ID: chatIDGroup, Type: telego.ChatTypeGroup},
+				Text:      "/start",
 			},
 		},
 		{
-			ID: 8,
-			Callback: &telebot.Callback{
-				Sender:  &telebot.User{ID: chatIDPrivate},
-				Message: &telebot.Message{ID: 8, Chat: &telebot.Chat{ID: chatIDPrivate}},
-				Data:    "\fnoop",
+			UpdateID: 8,
+			CallbackQuery: &telego.CallbackQuery{
+				From: telego.User{ID: chatIDPrivate},
+				Message: &telego.Message{
+					MessageID: 8,
+					Chat:      telego.Chat{ID: chatIDPrivate, Type: telego.ChatTypePrivate},
+				},
+				Data: "\fnoop",
 			},
 		},
 	}
@@ -567,20 +603,16 @@ func TestBotFlow_SC3_update_narrowing(t *testing.T) {
 // SC-4: chat-type guard (OD-SC4).
 // ---------------------------------------------------------------------------
 
-// SC4_chat_type_guard pins the POST-migration intent per OD-SC4 (a): a group
-// /start creates no state and sends nothing.
+// SC4_chat_type_guard enforces OD-SC4 (a): a group /start creates no FSM
+// state and sends nothing.
 //
-// NOTE: this row documents the INTENT, not today's behavior. On the current
-// telebot implementation a group /start DOES create state and send the
-// welcome keyboard (router.go has no chat-type guard). It is expected to
-// FAIL against today's code and gets pinned in T3 when the guard is added.
-// Skipped here so the oracle stays green on telebot; do not delete.
+// NOTE: this row was skipped until T3 because the pre-migration dispatcher
+// had NO chat-type guard - a group /start DID create state and sent the
+// welcome keyboard. T3 added predicates.MessageWithChatType(telego
+// .ChatTypePrivate) to every route, so the row is un-skipped and now pins
+// the post-migration contract. The skipped-era text is kept below in this
+// comment; do not re-skip.
 func TestBotFlow_SC4_chat_type_guard(t *testing.T) {
-	t.Skip(
-		"OD-SC4=(a): pins the POST-migration intent (group /start is dropped); " +
-			"today's telebot creates state and sends welcome. Pinned in T3.",
-	)
-
 	h := newFlowHarness(t)
 
 	h.send(groupMessage(9, chatIDGroup, "/start"))
@@ -595,9 +627,9 @@ func TestBotFlow_SC4_chat_type_guard(t *testing.T) {
 // Command matching: exact, case-sensitive, @suffix-aware.
 // ---------------------------------------------------------------------------
 
-// CM1_uppercase_stop_noop: "/STOP" in StateEmpty must NOT call Delete. Today
-// the command matcher is case-sensitive, so "/STOP" is not matched as a
-// command; the update is consumed by the fall-through OnText endpoint
+// CM1_uppercase_stop_noop: "/STOP" in StateEmpty must NOT call Delete. The
+// command matcher is case-sensitive, so "/STOP" is not matched as a
+// command; the update falls through to the plain-text endpoint
 // (registered for wait_for_contact only), so StateEmpty sees no handler and
 // the router silently drops it.
 func TestBotFlow_CM1_uppercase_stop_noop(t *testing.T) {
