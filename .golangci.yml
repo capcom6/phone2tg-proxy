@@ -254,9 +254,15 @@ linters:
         # public libs
         - "^github.com/gofiber/contrib/fiberzap/v2.Config$"
         - "^github.com/gofiber/fiber/v2.Config$"
+        - "^gopkg.in/telebot.v4.Callback$"
+        - "^gopkg.in/telebot.v4.Chat$"
+        - "^gopkg.in/telebot.v4.Contact$"
         - "^gopkg.in/telebot.v4.LongPoller$"
+        - "^gopkg.in/telebot.v4.Message$"
         - "^gopkg.in/telebot.v4.ReplyMarkup$"
         - "^gopkg.in/telebot.v4.Settings$"
+        - "^gopkg.in/telebot.v4.Update$"
+        - "^gopkg.in/telebot.v4.User$"
         - ^github.com/aws/aws-sdk-go-v2/service/s3.+Input$
         - ^github.com/aws/aws-sdk-go-v2/service/s3/types.ObjectIdentifier$
         - ^github.com/mitchellh/mapstructure.DecoderConfig$
