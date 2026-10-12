@@ -1,52 +1,59 @@
-package telegram_test
+// Package telegramtest provides the offline fake Bot API and SOCKS5 harness
+// re-homed from pkg/telegram: a loopback HTTP server that answers getMe plus
+// a SOCKS5 tunnel to it, so the production client path can be exercised end
+// to end without a single packet leaving the machine.
+//
+// The server is plain HTTP on purpose: telegofx builds the production client
+// (a fasthttp SOCKS5 client from telegofx.Config.ProxyURL) and exposes no CA
+// seam, and macOS ignores SSL_CERT_FILE, so an offline TLS hop could never be
+// trusted. Tests point telego at it with telego.WithAPIServer, the only
+// deviation from the production URL.
+package telegramtest
 
 import (
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
-	"crypto/tls"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
+	"context"
+	"fmt"
 	"io"
-	"math/big"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
-	"time"
 )
 
-// fakeHost is the API host telebot hardcodes, telebot.DefaultApiURL. The fake
-// serves that name, so the URL the client requests is unchanged from production.
+// fakeHost is the API host telego hardcodes, telego's defaultBotAPIServer.
+// The production URL keeps this host; the SOCKS tunnel ignores the requested
+// destination and dials the loopback fake, so the name never resolves.
 const fakeHost = "api.telegram.org"
 
-// fakeBotUsername is the identity the fake API reports for getMe. Nothing else
-// can produce it, so seeing it on the bot proves the call was answered locally.
-const fakeBotUsername = "test_bot"
+// APIServerURL is the plain-HTTP form of telego's default API server. Tests
+// pass it to telego.WithAPIServer so the offline client speaks plain HTTP to
+// the tunnel instead of TLS, which telegofx's fasthttp client cannot be
+// configured to trust.
+const APIServerURL = "http://" + fakeHost
 
-// telegramGetMeMethod is the single method telebot calls while building a bot.
+// FakeBotUsername is the identity the fake API reports for getMe. Nothing else
+// can produce it, so seeing it on a bot's GetMe result proves the call was
+// answered locally.
+const FakeBotUsername = "test_bot"
+
+// telegramGetMeMethod is the single method the fake answers while building a
+// bot identity.
 const telegramGetMeMethod = "getMe"
 
-// getMeResponse is the Bot API envelope telebot's extractOk decodes: ok=true
-// carries the result, so bot.Me is populated from it.
+// getMeResponse is the Bot API envelope the fake serves: ok=true carries the
+// result, so bot.GetMe decodes it into the fake identity.
 const getMeResponse = `{"ok":true,"result":{"id":424242,"is_bot":true,` +
-	`"first_name":"test","username":"test_bot"}}`
+	`"first_name":"test","username":"` + FakeBotUsername + `"}}`
 
 // loopbackEphemeral asks the kernel for a free loopback port, which is what
 // keeps parallel and repeated runs free of collisions.
 const loopbackEphemeral = "127.0.0.1:0"
 
-// certificateSerialNumber is the serial of the single self-signed certificate
-// minted per fake. It is not a certificate authority, so the value is
-// arbitrary.
-const certificateSerialNumber = 1
-
-// certificateValidity is how long the minted certificate stays valid on either
-// side of now.
-const certificateValidity = time.Hour
+// tunnelDoneSlots is the two copy goroutines of a tunnel (upstream to client
+// and client to upstream), each signalling completion exactly once.
+const tunnelDoneSlots = 2
 
 // SOCKS5 protocol constants, RFC 1928. Only the no-auth method and the CONNECT
 // command are implemented, which is the whole surface x/net/proxy uses for a
@@ -64,44 +71,36 @@ const (
 	socksReplyLen    = 10
 )
 
-// fakeAPI is a local stand-in for api.telegram.org plus the SOCKS5 proxy that
+// FakeAPI is a local stand-in for api.telegram.org plus the SOCKS5 proxy that
 // reaches it. It exists so the production graph can boot end to end without a
 // single packet leaving the machine: the graph's client still resolves
-// api.telegram.org and still speaks TLS to it, but the name is served by a
-// loopback listener and its certificate is trusted through the app's own
-// httpfx.Config provider.
-type fakeAPI struct {
+// fakeHost through the proxy and still speaks the Bot API, but the tunnel
+// answers every CONNECT with the loopback listener instead.
+type FakeAPI struct {
 	server   *httptest.Server
 	listener net.Listener
-	caPEM    string
 	proxyURL string
 	serving  sync.WaitGroup
 }
 
-// newFakeAPI starts the fake API and its proxy. Both are shut down through
+// NewFakeAPI starts the fake API and its proxy. Both are shut down through
 // t.Cleanup.
-func newFakeAPI(t *testing.T) *fakeAPI {
+func NewFakeAPI(t *testing.T) *FakeAPI {
 	t.Helper()
 
-	caPEM, cert := mintCertificate(t)
+	server := httptest.NewServer(http.HandlerFunc(serveGetMe))
 
-	server := httptest.NewUnstartedServer(http.HandlerFunc(serveGetMe))
-	serverTLS := new(tls.Config)
-	serverTLS.MinVersion = tls.VersionTLS12
-	serverTLS.Certificates = []tls.Certificate{cert}
-	server.TLS = serverTLS
-	server.StartTLS()
+	listenerCfg := new(net.ListenConfig)
 
-	listener, err := net.Listen("tcp", loopbackEphemeral)
+	listener, err := listenerCfg.Listen(context.Background(), "tcp", loopbackEphemeral)
 	if err != nil {
 		server.Close()
 		t.Fatalf("listen for the SOCKS5 proxy: %v", err)
 	}
 
-	api := &fakeAPI{
+	api := &FakeAPI{
 		server:   server,
 		listener: listener,
-		caPEM:    caPEM,
 		proxyURL: "socks5://" + listener.Addr().String(),
 		serving:  sync.WaitGroup{},
 	}
@@ -116,26 +115,21 @@ func newFakeAPI(t *testing.T) *fakeAPI {
 }
 
 // ProxyURL is the socks5 URL that routes to the fake API.
-func (f *fakeAPI) ProxyURL() string {
+func (f *FakeAPI) ProxyURL() string {
 	return f.proxyURL
-}
-
-// CACertPEM is the certificate to trust in httpfx.Config.
-func (f *fakeAPI) CACertPEM() string {
-	return f.caPEM
 }
 
 // close stops the proxy listener, waits for the accept loop to leave and shuts
 // the API down. Connections still parked in the client transport are not waited
 // for: they hold no test state, and the test that made them is already over.
-func (f *fakeAPI) close() {
+func (f *FakeAPI) close() {
 	_ = f.listener.Close()
 	f.serving.Wait()
 	f.server.Close()
 }
 
 // serveProxy accepts SOCKS5 connections until the listener is closed.
-func (f *fakeAPI) serveProxy() {
+func (f *FakeAPI) serveProxy() {
 	defer f.serving.Done()
 
 	for {
@@ -151,14 +145,16 @@ func (f *fakeAPI) serveProxy() {
 // tunnel answers one CONNECT and then copies bytes in both directions. The
 // destination the client asks for is deliberately ignored: every CONNECT is
 // answered with the local fake API, so the request never leaves the machine.
-func (f *fakeAPI) tunnel(client net.Conn) {
+func (f *FakeAPI) tunnel(client net.Conn) {
 	defer func() { _ = client.Close() }()
 
 	if !socksHandshake(client) {
 		return
 	}
 
-	upstream, err := net.Dial("tcp", f.server.Listener.Addr().String())
+	dialer := new(net.Dialer)
+
+	upstream, err := dialer.DialContext(context.Background(), "tcp", f.server.Listener.Addr().String())
 	if err != nil {
 		_ = writeSocksReply(client, socksReplyDenied)
 
@@ -171,7 +167,7 @@ func (f *fakeAPI) tunnel(client net.Conn) {
 		return
 	}
 
-	done := make(chan struct{}, 2)
+	done := make(chan struct{}, tunnelDoneSlots)
 
 	go func() {
 		_, _ = io.Copy(upstream, client)
@@ -256,13 +252,16 @@ func writeSocksReply(client net.Conn, code byte) error {
 	reply[1] = code
 	reply[3] = socksAtypIPv4
 
-	_, err := client.Write(reply)
+	if _, err := client.Write(reply); err != nil {
+		return fmt.Errorf("write socks reply: %w", err)
+	}
 
-	return err
+	return nil
 }
 
-// serveGetMe answers the one method telebot calls while building a bot. Any
-// other method is a 404, so an unexpected call cannot be mistaken for success.
+// serveGetMe answers the one method a test asks for while reading a bot
+// identity. Any other method is a 404, so an unexpected call cannot be
+// mistaken for success.
 func serveGetMe(w http.ResponseWriter, r *http.Request) {
 	if !strings.HasSuffix(r.URL.Path, "/"+telegramGetMeMethod) {
 		http.NotFound(w, r)
@@ -272,57 +271,4 @@ func serveGetMe(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = io.WriteString(w, getMeResponse)
-}
-
-// mintCertificate returns a PEM root and the matching key pair for a
-// self-signed certificate valid for fakeHost. One certificate is both the leaf
-// the fake presents and the root the client trusts, which is why it is its own
-// issuer.
-func mintCertificate(t *testing.T) (string, tls.Certificate) {
-	t.Helper()
-
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		t.Fatalf("generate the fake API key: %v", err)
-	}
-
-	template := new(x509.Certificate)
-	template.SerialNumber = big.NewInt(certificateSerialNumber)
-	subject := new(pkix.Name)
-	subject.CommonName = fakeHost
-	template.Subject = *subject
-	template.NotBefore = time.Now().Add(-certificateValidity)
-	template.NotAfter = time.Now().Add(certificateValidity)
-	template.KeyUsage = x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign
-	template.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}
-	template.BasicConstraintsValid = true
-	template.IsCA = true
-	template.DNSNames = []string{fakeHost}
-
-	der, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
-	if err != nil {
-		t.Fatalf("create the fake API certificate: %v", err)
-	}
-
-	certBlock := new(pem.Block)
-	certBlock.Type = "CERTIFICATE"
-	certBlock.Bytes = der
-	certPEM := pem.EncodeToMemory(certBlock)
-
-	keyDER, err := x509.MarshalECPrivateKey(key)
-	if err != nil {
-		t.Fatalf("marshal the fake API key: %v", err)
-	}
-
-	keyBlock := new(pem.Block)
-	keyBlock.Type = "EC PRIVATE KEY"
-	keyBlock.Bytes = keyDER
-	keyPEM := pem.EncodeToMemory(keyBlock)
-
-	cert, err := tls.X509KeyPair(certPEM, keyPEM)
-	if err != nil {
-		t.Fatalf("assemble the fake API key pair: %v", err)
-	}
-
-	return string(certPEM), cert
 }

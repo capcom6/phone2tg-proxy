@@ -55,7 +55,7 @@ var errStubSend = errors.New("stub proxy send")
 
 // stubProxy satisfies proxy.Service without touching Redis or Telegram. It is
 // supplied in place of proxy.Module(true), whose real dependencies are
-// storage.Service and *telebot.Bot and would make the graph non-hermetic.
+// storage.Service and *telegofx.Bot and would make the graph non-hermetic.
 type stubProxy struct{}
 
 // Send implements proxy.Service.
