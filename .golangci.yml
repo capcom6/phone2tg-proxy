@@ -254,15 +254,22 @@ linters:
         # public libs
         - "^github.com/gofiber/contrib/fiberzap/v2.Config$"
         - "^github.com/gofiber/fiber/v2.Config$"
-        - "^gopkg.in/telebot.v4.Callback$"
-        - "^gopkg.in/telebot.v4.Chat$"
-        - "^gopkg.in/telebot.v4.Contact$"
-        - "^gopkg.in/telebot.v4.LongPoller$"
-        - "^gopkg.in/telebot.v4.Message$"
-        - "^gopkg.in/telebot.v4.ReplyMarkup$"
-        - "^gopkg.in/telebot.v4.Settings$"
-        - "^gopkg.in/telebot.v4.Update$"
-        - "^gopkg.in/telebot.v4.User$"
+        # telego/telegofx types the T3 port constructs: the handler port's
+        # reply markups, SendMessageParams and ChatID (internal/proxy already
+        # needed the latter two in T2) plus the update-side types the re-pointed
+        # oracle builds in bot_flow_test.go.
+        - "^github.com/go-core-fx/telegofx.Config$"
+        - "^github.com/mymmrac/telego.CallbackQuery$"
+        - "^github.com/mymmrac/telego.Chat$"
+        - "^github.com/mymmrac/telego.ChatID$"
+        - "^github.com/mymmrac/telego.Contact$"
+        - "^github.com/mymmrac/telego.KeyboardButton$"
+        - "^github.com/mymmrac/telego.Message$"
+        - "^github.com/mymmrac/telego.ReplyKeyboardMarkup$"
+        - "^github.com/mymmrac/telego.ReplyKeyboardRemove$"
+        - "^github.com/mymmrac/telego.SendMessageParams$"
+        - "^github.com/mymmrac/telego.Update$"
+        - "^github.com/mymmrac/telego.User$"
         - ^github.com/aws/aws-sdk-go-v2/service/s3.+Input$
         - ^github.com/aws/aws-sdk-go-v2/service/s3/types.ObjectIdentifier$
         - ^github.com/mitchellh/mapstructure.DecoderConfig$
