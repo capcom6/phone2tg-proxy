@@ -49,6 +49,8 @@ func handlerRoutes(t *testing.T) []string {
 // fails a graph construction; both only ever show up as a 404 in production.
 // Pinning the exact table turns both into loud, local failures.
 func TestRegisteredRouteTable(t *testing.T) {
+	t.Parallel()
+
 	want := []string{
 		routeKey(http.MethodGet, routeHealth),
 		routeKey(http.MethodGet, routeHealthLive),
@@ -77,6 +79,8 @@ func TestRegisteredRouteTable(t *testing.T) {
 // paths answer. One answers with the handler, the other with fiber's default 404,
 // and a 404 is exactly what the defect produced.
 func TestMessagesRouteIsRegisteredAtThePublicPath(t *testing.T) {
+	t.Parallel()
+
 	wantKey := routeKey(http.MethodPost, routeMessages)
 	driftKey := routeKey(http.MethodPost, "/api/v1")
 
@@ -95,6 +99,8 @@ func TestMessagesRouteIsRegisteredAtThePublicPath(t *testing.T) {
 // served by a single wildcard Use mount rather than by per-file routes, so this
 // one has to read the unfiltered route list.
 func TestOpenAPIDocsAreRegistered(t *testing.T) {
+	t.Parallel()
+
 	app := newWiredHealthApp(t)
 
 	want := routeKey(http.MethodGet, "/api/v1/docs/*")
@@ -120,6 +126,8 @@ func TestOpenAPIDocsAreRegistered(t *testing.T) {
 // entirely different routes, so the title is the cheapest proof that the right
 // spec reached the handler.
 func TestOpenAPIDocJSONServesThisServiceSpec(t *testing.T) {
+	t.Parallel()
+
 	app := newWiredHealthApp(t)
 
 	code, body := getHealth(t, app, "/api/v1/docs/doc.json")
@@ -156,9 +164,10 @@ func TestOpenAPIDocJSONServesThisServiceSpec(t *testing.T) {
 // response is built with a nil details value, and the response carries
 // omitempty, so the key must not appear.
 func TestMessagesEmptyBodyRejectionShape(t *testing.T) {
-	t.Setenv("TELEGRAM__TOKEN", sentinelToken)
-	t.Setenv("STORAGE__SECRET", sentinelSecret)
+	t.Parallel()
 
+	// Sentinel configuration comes from TestMain, set before the graph was
+	// built.
 	app := newWiredHealthApp(t)
 
 	code, body := postJSON(t, app, routeMessages, "{}")
@@ -191,6 +200,8 @@ func TestMessagesEmptyBodyRejectionShape(t *testing.T) {
 // is unrouted, so a passing table assertion cannot be an artifact of a stray
 // catch-all.
 func TestBareAPIPrefixIsNotAMessagesHandler(t *testing.T) {
+	t.Parallel()
+
 	app := newWiredHealthApp(t)
 
 	code, body := postJSON(t, app, routeAPIBase, "{}")

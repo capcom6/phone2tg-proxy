@@ -1,12 +1,13 @@
 package config_test
 
 // telegofx_test.go re-homes the deleted internal/telegramclient suite onto
-// the surviving subject: the telegofx.Config that internal/config now
-// provides, and the proxy client telegofx itself builds from it. The old
-// net/http factory module is gone, so the accept/reject matrix, the
-// precedence rows and the token gate are measured through the PRODUCTION
-// wiring (config.Module + telegofx.Module(WithRouter)), driven by the same
-// env keys production uses.
+// the surviving subject: the telegofx.Config production hands telegofx, and
+// the proxy client telegofx itself builds from it. The old net/http factory
+// module is gone, so the accept/reject matrix, the precedence rows and the
+// token gate are measured through the PRODUCTION bot wiring
+// (telegofx.Module(WithRouter)), one supplied telegofx.Config per row.
+// See graphErr for why the rows supply that value instead of driving the
+// TELEGRAM__* env path.
 //
 // telegofx's rejection sentinels (errUnsupportedProxyScheme, errEmptyProxyHost
 // in telegofx/proxy.go) are UNEXPORTED, so errors.Is cannot pin rejections
@@ -21,7 +22,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/capcom6/phone2tg-proxy/internal/config"
 	"github.com/capcom6/phone2tg-proxy/internal/telegramtest"
 	"github.com/go-core-fx/logger"
 	"github.com/go-core-fx/telegofx"
@@ -52,22 +52,28 @@ const rejectedProxyURL = "http://127.0.0.1:8080"
 const failedBotBuild = "failed to build *telegofx.Bot"
 
 // graphErr constructs the production-shaped graph for one configuration:
-// logger + config.Module (which maps TELEGRAM__* env into telegofx.Config) +
-// telegofx with the router, plus the bot options and extra fx options a case
-// needs. Construction only; nothing is started, so no polling begins.
+// logger + the telegofx.Config under test + telegofx with the router, plus the
+// bot options and extra fx options a case needs. Construction only; nothing is
+// started, so no polling begins.
 //
-// Config values travel through the env keys production reads, which is also
-// what keeps every case free of ambient TELEGRAM__* leakage: both keys are
-// set explicitly on every call.
+// The config is SUPPLIED as a value rather than driven through the TELEGRAM__*
+// env keys internal/config reads. t.Setenv mutates the process environment and
+// is incompatible with t.Parallel, and these rows measure telegofx.New - the
+// proxy-scheme matrix, the token gate and their precedence - not the koanf
+// mapping that feeds it. Supplying the very values config.Module would have
+// produced from the env keeps every row value and every assertion unchanged
+// while leaving the process environment untouched, which is what lets the matrix
+// rows run concurrently.
 func graphErr(t *testing.T, token, proxyURL string, botOptions []telego.BotOption, opts ...fx.Option) error {
 	t.Helper()
 
-	t.Setenv("TELEGRAM__TOKEN", token)
-	t.Setenv("TELEGRAM__PROXY_URL", proxyURL)
-
 	wiring := []fx.Option{
 		logger.Module(),
-		config.Module(),
+		fx.Supply(telegofx.Config{
+			Token:    token,
+			Mode:     telegofx.ModePolling,
+			ProxyURL: proxyURL,
+		}),
 		telegofx.Module(telegofx.WithRouter()),
 		fx.Supply(botOptions),
 		fx.WithLogger(func() fxevent.Logger { return fxevent.NopLogger }),
@@ -224,8 +230,12 @@ var proxySchemeMatrix = []proxyCase{
 // TestConfig_ProxySchemeMatrix pins the measured matrix of the proxy URL the
 // production config hands telegofx.
 func TestConfig_ProxySchemeMatrix(t *testing.T) {
+	t.Parallel()
+
 	for _, tt := range proxySchemeMatrix {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			err := graphErr(t, "", tt.proxyURL, []telego.BotOption{})
 			if err == nil {
 				t.Fatalf("graph(%q) resolved, want a rejection at telegofx.New or the token gate", tt.proxyURL)
@@ -288,6 +298,8 @@ func assertRejected(t *testing.T, proxyURL, wantReject string, err error) {
 // client BEFORE telego.NewBot, so a proxy rejection beats the token gate in
 // every combination - the OD-6 shape survives the transport swap.
 func TestConfig_ProxyErrorPrecedence(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name        string
 		token       string
@@ -322,6 +334,8 @@ func TestConfig_ProxyErrorPrecedence(t *testing.T) {
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			err := graphErr(t, tt.token, tt.proxyURL, []telego.BotOption{})
 			if err == nil {
 				t.Fatalf("graph(token=%q, proxy=%q) resolved, want a failure", tt.token, tt.proxyURL)
@@ -355,6 +369,8 @@ func TestConfig_ProxyErrorPrecedence(t *testing.T) {
 // every non-empty malformed token yields telego.ErrInvalidToken, because
 // telego validates ^\d+:[\w-]{35}$ instead of trimming.
 func TestConfig_TokenGateRejectsWhitespace(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		token   string
@@ -369,6 +385,8 @@ func TestConfig_TokenGateRejectsWhitespace(t *testing.T) {
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			err := graphErr(t, tt.token, acceptedProxyURL, []telego.BotOption{})
 			if err == nil {
 				t.Fatalf("graph(token=%q) resolved, want %v", tt.token, tt.wantErr)
@@ -385,18 +403,22 @@ func TestConfig_TokenGateRejectsWhitespace(t *testing.T) {
 	}
 }
 
-// TestConfig_ProductionGraphGetMeThroughProxy boots the production graph with
-// the bot wired in and reads the bot's identity back through the ACTIVE
+// TestConfig_ProductionGraphGetMeThroughProxy boots the production bot wiring
+// with the bot wired in and reads the bot's identity back through the ACTIVE
 // client path: telegofx's fasthttp SOCKS5 client (built from the ProxyURL
-// internal/config provides) -> the loopback SOCKS5 tunnel -> the local fake
+// production supplies) -> the loopback SOCKS5 tunnel -> the local fake
 // Bot API. No packet leaves the machine - the tunnel ignores the requested
 // destination and dials the loopback fake.
 //
-// Two deviations from production, both test-only: the bot options carry
+// Three deviations from production, all test-only: the bot options carry
 // telego.WithAPIServer pointing at plain http (telegofx's fasthttp client
-// exposes no CA seam, so an offline TLS hop could not be trusted), and the
-// graph is construction-only - Start is never called, so no polling begins.
+// exposes no CA seam, so an offline TLS hop could not be trusted), the
+// graph is construction-only - Start is never called, so no polling begins -
+// and the telegofx.Config is supplied rather than mapped from the env, as
+// graphErr explains.
 func TestConfig_ProductionGraphGetMeThroughProxy(t *testing.T) {
+	t.Parallel()
+
 	api := telegramtest.NewFakeAPI(t)
 
 	var b *telegofx.Bot

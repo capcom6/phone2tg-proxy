@@ -170,6 +170,8 @@ func assertListenerReleased(t *testing.T, address string) {
 // constructible is already covered in internal/server, but no other test proves
 // the OnStart listener hook binds, serves and gives the port back.
 func TestStartStopLifecycleBindsAndReleasesTheListener(t *testing.T) {
+	t.Parallel()
+
 	reservation, address := reserveLocalAddress(t)
 
 	fxApp, _ := newLifecycleGraph(t, address)
