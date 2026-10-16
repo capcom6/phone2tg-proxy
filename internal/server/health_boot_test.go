@@ -15,6 +15,8 @@ import (
 // separate test package with its own test binary. See TestMain here for why
 // binding the listener here would race under -race.
 func TestAppBootSmoke(t *testing.T) {
+	t.Parallel()
+
 	app := newWiredHealthApp(t)
 
 	want := map[string]bool{

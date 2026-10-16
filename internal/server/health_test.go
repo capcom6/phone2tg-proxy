@@ -86,6 +86,8 @@ func getHealth(t *testing.T, app *fiber.App, path string) (int, string) {
 // the writeProbe contract: 200 while the overall status is not "fail", 503 once
 // it is (fiberfx/health health.go:77-83).
 func TestHealthRouteMatrix(t *testing.T) {
+	t.Parallel()
+
 	app := newWiredHealthApp(t)
 
 	for _, path := range healthRoutePaths() {
@@ -162,6 +164,8 @@ func newStubHealthApp(t *testing.T, providers ...healthfx.Provider) *fiber.App {
 // "warn" - which the built-in system provider uses above 100 goroutines or
 // 128MiB of heap - still maps to 200 (F-10).
 func TestHealthProbeStatusMatrix(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		status healthfx.Status
@@ -174,6 +178,8 @@ func TestHealthProbeStatusMatrix(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			app := newStubHealthApp(t, stubHealthProvider{name: "stub", status: tc.status})
 
 			for _, path := range healthRoutePaths() {
@@ -259,6 +265,8 @@ func assertChecksWhitelist(t *testing.T, path, raw string) {
 // TestHealthBodyKeyWhitelist is a whitelist, not a blocklist: it proves no key
 // outside the dto can appear, so no secret can hide in an unanticipated field.
 func TestHealthBodyKeyWhitelist(t *testing.T) {
+	t.Parallel()
+
 	app := newWiredHealthApp(t)
 
 	for _, path := range healthRoutePaths() {

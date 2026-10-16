@@ -1,14 +1,15 @@
 // Package handler defines the contract every bot handler implements to mount
-// its routes on the shared dispatcher.
+// its routes directly on the shared telegofx router.
 package handler
 
-import "github.com/capcom6/phone2tg-proxy/internal/bot/router"
+import "github.com/go-core-fx/telegofx"
 
-// Handler registers bot routes in the shared dispatcher seam. The seam keeps
-// the FSM state consultation, the exact-match command predicates and the
-// chat-type guard on every route; handlers only declare (state, endpoint)
-// pairs and their bodies.
+// Handler registers bot routes on the shared telegofx router - the owner's
+// reference pattern: each handler declares its own ordered predicate chain
+// (private-chat guard, fsm.StateEqual, command/text predicate) and
+// telegohandler dispatches first-match-wins over registration order. There
+// is no central registrar between the handler and the router.
 type Handler interface {
-	// Register mounts the handler's routes on r.
-	Register(r *router.Router) error
+	// Register mounts the handler's routes on router.
+	Register(router *telegofx.Router)
 }

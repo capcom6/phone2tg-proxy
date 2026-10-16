@@ -24,11 +24,7 @@ func Run(version healthfx.Version) {
 		healthfx.Module(),
 		//
 		config.Module(),
-		// telegofx provides *telegofx.Bot for internal/proxy and the router
-		// internal/bot registers its routes on; internal/config supplies its
-		// telegofx.Config (token, polling mode, proxy URL) and internal/bot
-		// supplies the required []telego.BotOption.
-		telegofx.Module(telegofx.WithRouter()),
+		telegofx.Module(telegofx.WithRouter(), telegofx.WithFSM()),
 		redisfx.Module(),
 		validatorfx.Module(),
 		//

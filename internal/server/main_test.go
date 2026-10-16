@@ -93,7 +93,7 @@ func newTestGraph() *fx.App {
 //
 // Starting it would instead race: fasthttp.Server.Serve sets Server.done to a
 // non-nil channel (server.go:1970), so RequestCtx.Done stops returning nil, so
-// the healthfx probe's context.WithTimeout(c.Context(), 5s) spawns a
+// the healthfx probe's [context.WithTimeout] call spawns a
 // propagateCancel goroutine that reads RequestCtx.s.done - the exact field
 // fasthttp.Server.ShutdownWithContext writes to nil (server.go:2085) while
 // holding no lock it shares with that reader. That is an acknowledged upstream

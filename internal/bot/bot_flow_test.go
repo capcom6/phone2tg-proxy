@@ -19,20 +19,18 @@ import (
 	"io"
 	"net/http"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"testing"
 
-	"github.com/capcom6/phone2tg-proxy/internal/bot/fsm"
 	"github.com/capcom6/phone2tg-proxy/internal/bot/handlers"
 	"github.com/capcom6/phone2tg-proxy/internal/bot/handlers/start"
 	"github.com/capcom6/phone2tg-proxy/internal/bot/handlers/stop"
-	"github.com/capcom6/phone2tg-proxy/internal/bot/router"
+	"github.com/capcom6/phone2tg-proxy/internal/fsm/memory"
 	"github.com/capcom6/phone2tg-proxy/internal/i18n"
 	"github.com/capcom6/phone2tg-proxy/internal/storage"
 	"github.com/go-core-fx/telegofx"
-	"github.com/gofiber/storage/memory/v2"
+	"github.com/go-core-fx/telegofx/fsm"
 	"github.com/mymmrac/telego"
 	"go.uber.org/zap"
 )
@@ -74,7 +72,7 @@ type tgCall struct {
 	Params map[string]any `json:"-"`
 }
 
-// recordingTransport implements http.RoundTripper. It records every request
+// recordingTransport implements [http.RoundTripper]. It records every request
 // the bot makes (method + JSON body) and answers {"ok":true} so Raw() never
 // errors. No packet leaves the process.
 type recordingTransport struct {
@@ -260,15 +258,18 @@ const (
 )
 
 // flowHarness wires the exact production graph from internal/bot/module.go:
-// router.New(fsm, rt, username) -> the start/stop handlers registering on the
-// seam, but with an offline telego bot whose HTTP client records every call.
+// handlers registering their ordered predicate chains DIRECTLY on the shared
+// telegofx router (the owner's reference pattern), the telegofx/fsm Store
+// over the
+// in-memory Storage - but with an offline telego bot whose HTTP client
+// records every call.
 type flowHarness struct {
-	t          *testing.T
-	bot        *telegofx.Bot
-	router     *telegofx.Router
-	transport  *recordingTransport
-	storage    *fakeStorage
-	fsmService *fsm.Service
+	t         *testing.T
+	bot       *telegofx.Bot
+	router    *telegofx.Router
+	transport *recordingTransport
+	storage   *fakeStorage
+	fsmStore  *fsm.Store
 }
 
 func newFlowHarness(t *testing.T) *flowHarness {
@@ -310,32 +311,24 @@ func newFlowHarness(t *testing.T) *flowHarness {
 	}
 
 	logger := zap.NewNop()
-	fsmStorage := memory.New()
-	fsmService := fsm.New("fsm", 0, fsmStorage)
+	fsmStore := fsm.NewStore(memory.New(), logger)
 
-	// Registration order mirrors internal/bot/module.go: the routes register
-	// through the shared seam in handler registration order, so the command
-	// endpoints land before the plain-text fall-through. The username
-	// provider is a plain function so CM2/CM3 resolve without a network call.
-	r := router.New(fsmService, rt, func() string { return ownBotName })
+	// Registration mirrors internal/bot/module.go: start registers its three
+	// routes first, then stop's /stop, both directly on the router.
 
-	startHandler := start.New(st, newTestTranslator(t))
-	stopHandler := stop.New(st, logger, newTestTranslator(t))
+	startHandler := start.New(fsmStore, st, newTestTranslator(t))
+	stopHandler := stop.New(fsmStore, st, logger, newTestTranslator(t))
 
-	if regErr := startHandler.Register(r); regErr != nil {
-		t.Fatalf("register start handler: %v", regErr)
-	}
-	if regErr := stopHandler.Register(r); regErr != nil {
-		t.Fatalf("register stop handler: %v", regErr)
-	}
+	startHandler.Register(rt)
+	stopHandler.Register(rt)
 
 	return &flowHarness{
-		t:          t,
-		bot:        b,
-		router:     rt,
-		transport:  transport,
-		storage:    st,
-		fsmService: fsmService,
+		t:         t,
+		bot:       b,
+		router:    rt,
+		transport: transport,
+		storage:   st,
+		fsmStore:  fsmStore,
 	}
 }
 
@@ -353,30 +346,45 @@ func newTestTranslator(t *testing.T) *i18n.Service {
 }
 
 // setState primes chatIDPrivate to wait_for_contact, as if onboarding was
-// mid-flight (the only non-empty state the suite needs).
+// mid-flight (the only non-empty state the suite needs). State is keyed by
+// chat+user; the private fixtures set Chat.ID == From.ID == chatIDPrivate.
 func (h *flowHarness) setState() {
 	h.t.Helper()
 
-	if err := h.fsmService.Set(
-		strconv.FormatInt(chatIDPrivate, 10),
-		fsm.NewState(handlers.StateStartWaitForContact),
+	if err := h.fsmStore.Set(
+		context.Background(),
+		chatIDPrivate,
+		chatIDPrivate,
+		handlers.StateStartWaitForContact,
 	); err != nil {
 		h.t.Fatalf("set state: %v", err)
 	}
 }
 
-func (h *flowHarness) getState(chatID int64) fsm.StateName {
+// getState returns the FSM state recorded for chatID. Under chat+user
+// keying a state may live under (chatID, chatID) - the private fixtures -
+// or (chatID, otherUserID) - the group fixture's sender - so BOTH candidate
+// keys are probed: otherwise a guard regression writing
+// (chatIDGroup, otherUserID) would be invisible to SC-4. An empty result
+// means no state was ever written for the chat.
+func (h *flowHarness) getState(chatID int64) string {
 	h.t.Helper()
 
-	st, err := h.fsmService.Get(strconv.FormatInt(chatID, 10))
-	if err != nil {
-		h.t.Fatalf("get state: %v", err)
+	for _, userID := range []int64{chatID, otherUserID} {
+		state, err := h.fsmStore.Get(context.Background(), chatID, userID)
+		if err != nil {
+			h.t.Fatalf("get state: %v", err)
+		}
+		if state != "" {
+			return state
+		}
 	}
-	return st.Name
+
+	return fsm.StateEmpty
 }
 
 // send drives exactly one update through the real dispatch cascade,
-// synchronously: HandleUpdate runs middleware, predicates and the dispatcher
+// synchronously: HandleUpdate runs middleware, predicates and the state groups
 // inline before returning.
 func (h *flowHarness) send(u telego.Update) {
 	h.t.Helper()
@@ -458,7 +466,7 @@ func (h *flowHarness) assertNoReply() {
 }
 
 // assertState checks the FSM state of chatIDPrivate.
-func (h *flowHarness) assertState(want fsm.StateName) {
+func (h *flowHarness) assertState(want string) {
 	h.t.Helper()
 
 	if got := h.getState(chatIDPrivate); got != want {
@@ -474,6 +482,8 @@ func (h *flowHarness) assertState(want fsm.StateName) {
 // NOT call storage.Delete and sends no reply (the update is silently
 // consumed by the command matcher; no handler is registered for the state).
 func TestBotFlow_SC1_blocked_stop_mid_onboarding(t *testing.T) {
+	t.Parallel()
+
 	h := newFlowHarness(t)
 	h.setState()
 
@@ -489,6 +499,8 @@ func TestBotFlow_SC1_blocked_stop_mid_onboarding(t *testing.T) {
 // SC1_stop_in_empty: /stop in StateEmpty calls Delete and replies with the
 // literal delete_success text.
 func TestBotFlow_SC1_stop_in_empty(t *testing.T) {
+	t.Parallel()
+
 	h := newFlowHarness(t)
 
 	h.send(privateMessage(2, "/stop"))
@@ -503,6 +515,8 @@ func TestBotFlow_SC1_stop_in_empty(t *testing.T) {
 // SC2_same_user_contact_stores: a contact whose user id equals the chat id is
 // stored with (PhoneNumber, chat.ID) and the state is deleted.
 func TestBotFlow_SC2_same_user_contact_stores(t *testing.T) {
+	t.Parallel()
+
 	h := newFlowHarness(t)
 	h.setState()
 
@@ -522,6 +536,8 @@ func TestBotFlow_SC2_same_user_contact_stores(t *testing.T) {
 // SC2_other_user_contact_rejected: a contact owned by another user is NOT
 // stored; share_contact is sent and the state is unchanged.
 func TestBotFlow_SC2_other_user_contact_rejected(t *testing.T) {
+	t.Parallel()
+
 	h := newFlowHarness(t)
 	h.setState()
 
@@ -537,6 +553,8 @@ func TestBotFlow_SC2_other_user_contact_rejected(t *testing.T) {
 // SC2_invalid_phone_keeps_state: storage rejecting the phone keeps the state
 // and replies with the invalid_phone text.
 func TestBotFlow_SC2_invalid_phone_keeps_state(t *testing.T) {
+	t.Parallel()
+
 	h := newFlowHarness(t)
 	h.setState()
 	h.storage.storeErr = storage.ErrInvalidPhoneNumber
@@ -555,6 +573,8 @@ func TestBotFlow_SC2_invalid_phone_keeps_state(t *testing.T) {
 // updates create no FSM state (the dispatcher only routes updates whose
 // update.Message is set; nothing keys FSM state off the other fields).
 func TestBotFlow_SC3_update_narrowing(t *testing.T) {
+	t.Parallel()
+
 	h := newFlowHarness(t)
 
 	updates := []telego.Update{
@@ -613,6 +633,8 @@ func TestBotFlow_SC3_update_narrowing(t *testing.T) {
 // the post-migration contract. The skipped-era text is kept below in this
 // comment; do not re-skip.
 func TestBotFlow_SC4_chat_type_guard(t *testing.T) {
+	t.Parallel()
+
 	h := newFlowHarness(t)
 
 	h.send(groupMessage(9, chatIDGroup, "/start"))
@@ -624,42 +646,52 @@ func TestBotFlow_SC4_chat_type_guard(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Command matching: exact, case-sensitive, @suffix-aware.
+// Command matching: th.CommandEqual - case-insensitive, @suffix-agnostic.
 // ---------------------------------------------------------------------------
 
-// CM1_uppercase_stop_noop: "/STOP" in StateEmpty must NOT call Delete. The
-// command matcher is case-sensitive, so "/STOP" is not matched as a
-// command; the update falls through to the plain-text endpoint
-// (registered for wait_for_contact only), so StateEmpty sees no handler and
-// the router silently drops it.
-func TestBotFlow_CM1_uppercase_stop_noop(t *testing.T) {
+// CM1_uppercase_stop_unlinks: "/STOP" in StateEmpty IS matched as /stop
+// (th.CommandEqual compares group 1 EqualFold, owner decision A): Delete is
+// called, the delete_success literal is replied, and the state stays
+// StateEmpty. Re-pinned from CM1_uppercase_stop_noop, whose case-sensitive
+// no-op expectation became false with th.CommandEqual.
+func TestBotFlow_CM1_uppercase_stop_unlinks(t *testing.T) {
+	t.Parallel()
+
 	h := newFlowHarness(t)
 
 	h.send(privateMessage(10, "/STOP"))
 
-	if got := h.storage.storeCalls(); len(got) != 0 {
-		t.Fatalf("storage.Delete must NOT be called for /STOP, got %v", got)
+	if got := h.storage.deleteCalls(); len(got) != 1 || got[0] != chatIDPrivate {
+		t.Fatalf("storage.Delete must be called once for chat %d, got %v", chatIDPrivate, got)
 	}
-	h.assertNoReply()
+	h.assertLastText(msgDeleteOK)
 	h.assertState(fsm.StateEmpty)
 }
 
-// CM2_at_other_bot_dropped: "/start@OtherBot" is dropped before any handler
-// runs because the @suffix does not match this bot's username.
-func TestBotFlow_CM2_at_other_bot_dropped(t *testing.T) {
+// CM2_at_other_bot_runs_start: "/start@OtherBot" IS matched as /start
+// (th.CommandEqual ignores the @suffix, owner decision A): the start flow
+// runs - welcome reply sent, state enters wait_for_contact. Re-pinned from
+// CM2_at_other_bot_dropped, whose suffix-rejection expectation became false
+// with th.CommandEqual. The start handler never touches the phone storage
+// (that happens on CONTACT), so the run is proven by reply + state.
+func TestBotFlow_CM2_at_other_bot_runs_start(t *testing.T) {
+	t.Parallel()
+
 	h := newFlowHarness(t)
 
 	h.send(privateMessage(11, "/start@"+otherBotName))
 
 	if got := h.storage.storeCalls(); len(got) != 0 {
-		t.Fatalf("start flow must NOT run for @other-bot command, got %v", got)
+		t.Fatalf("phone storage must stay untouched until CONTACT, got %v", got)
 	}
-	h.assertNoReply()
-	h.assertState(fsm.StateEmpty)
+	h.assertLastText(msgWelcome)
+	h.assertState(handlers.StateStartWaitForContact)
 }
 
 // CM3_at_own_bot_accepted: "/start@<own username>" runs the start flow.
 func TestBotFlow_CM3_at_own_bot_accepted(t *testing.T) {
+	t.Parallel()
+
 	h := newFlowHarness(t)
 
 	h.send(privateMessage(12, "/start@"+ownBotName))
@@ -676,6 +708,8 @@ func TestBotFlow_CM3_at_own_bot_accepted(t *testing.T) {
 // with keyboard[0][0].request_contact == true, resize_keyboard == true and
 // one_time_keyboard == true.
 func TestBotFlow_KB1_welcome_keyboard_shape(t *testing.T) {
+	t.Parallel()
+
 	h := newFlowHarness(t)
 
 	h.send(privateMessage(13, "/start"))
@@ -711,6 +745,8 @@ func TestBotFlow_KB1_welcome_keyboard_shape(t *testing.T) {
 // KB2_thanks_remove_keyboard: the thanks sendMessage carries
 // reply_markup.remove_keyboard == true in the SAME request.
 func TestBotFlow_KB2_thanks_remove_keyboard(t *testing.T) {
+	t.Parallel()
+
 	h := newFlowHarness(t)
 	h.setState()
 
@@ -729,6 +765,8 @@ func TestBotFlow_KB2_thanks_remove_keyboard(t *testing.T) {
 // TestBotFlow_reply_literals_are_distinct guards the oracle against silent
 // i18n key collisions: two distinct keys must never produce the same literal.
 func TestBotFlow_reply_literals_are_distinct(t *testing.T) {
+	t.Parallel()
+
 	literals := map[string]string{
 		"welcome_message":      msgWelcome,
 		"send_contact":         msgSendContact,

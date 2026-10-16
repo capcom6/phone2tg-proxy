@@ -30,10 +30,14 @@ const localesDir = "../../i18n/locales"
 // TestI18n_AllKeysPresent asserts that en.json and ru.json each contain
 // exactly the 8 expected keys.
 func TestI18n_AllKeysPresent(t *testing.T) {
+	t.Parallel()
+
 	locales := []string{"en", "ru"}
 
 	for _, lang := range locales {
 		t.Run(lang, func(t *testing.T) {
+			t.Parallel()
+
 			path := filepath.Join(localesDir, lang+".json")
 
 			data, err := os.ReadFile(path)
