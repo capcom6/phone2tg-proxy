@@ -1,9 +1,9 @@
-// Package memory provides the in-memory fsm.Storage backing the bot's
+// Package state provides the in-memory fsm.Storage backing the bot's
 // conversation state. It is a deliberate no-behavior-change choice (owner
 // decision): no new Redis traffic and no durability change - OD-2 (FSM
 // durability) stays open. State is keyed by chat+user pair and never
 // expires, matching the superseded chat-keyed FSM, which had no TTL either.
-package memory
+package state
 
 import (
 	"context"
@@ -24,8 +24,8 @@ type entryKey struct {
 	userID int64
 }
 
-// New creates an empty in-memory Storage.
-func New() *Storage {
+// NewStorage creates an empty in-memory Storage.
+func NewStorage() *Storage {
 	return &Storage{
 		mu:     sync.RWMutex{},
 		states: map[entryKey]string{},

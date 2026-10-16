@@ -4,7 +4,7 @@ import (
 	"github.com/capcom6/phone2tg-proxy/internal/bot/handler"
 	"github.com/capcom6/phone2tg-proxy/internal/bot/handlers/start"
 	"github.com/capcom6/phone2tg-proxy/internal/bot/handlers/stop"
-	"github.com/capcom6/phone2tg-proxy/internal/fsm/memory"
+	"github.com/capcom6/phone2tg-proxy/internal/state"
 	"github.com/go-core-fx/logger"
 	"github.com/go-core-fx/telegofx"
 	"github.com/go-core-fx/telegofx/fsm"
@@ -39,7 +39,7 @@ func Module() fx.Option {
 			// which is a SIBLING of this "bot" module. A private provider here is
 			// invisible to it, so *fsm.Store would fail to resolve with
 			// "missing type: fsm.Storage" at fx.Invoke time.
-			func() fsm.Storage { return memory.New() },
+			func() fsm.Storage { return state.NewStorage() },
 		),
 		// go-project-template registration pattern: one subpackage per
 		// handler, each constructor annotated into the "handlers" value
