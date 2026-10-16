@@ -26,8 +26,8 @@ import (
 	"github.com/capcom6/phone2tg-proxy/internal/bot/handlers"
 	"github.com/capcom6/phone2tg-proxy/internal/bot/handlers/start"
 	"github.com/capcom6/phone2tg-proxy/internal/bot/handlers/stop"
-	"github.com/capcom6/phone2tg-proxy/internal/fsm/memory"
 	"github.com/capcom6/phone2tg-proxy/internal/i18n"
+	"github.com/capcom6/phone2tg-proxy/internal/state"
 	"github.com/capcom6/phone2tg-proxy/internal/storage"
 	"github.com/go-core-fx/telegofx"
 	"github.com/go-core-fx/telegofx/fsm"
@@ -311,7 +311,7 @@ func newFlowHarness(t *testing.T) *flowHarness {
 	}
 
 	logger := zap.NewNop()
-	fsmStore := fsm.NewStore(memory.New(), logger)
+	fsmStore := fsm.NewStore(state.NewStorage(), logger)
 
 	// Registration mirrors internal/bot/module.go: start registers its three
 	// routes first, then stop's /stop, both directly on the router.
