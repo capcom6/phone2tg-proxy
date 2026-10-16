@@ -9,6 +9,8 @@ import (
 )
 
 func TestNewService_English(t *testing.T) {
+	t.Parallel()
+
 	config := i18n.Config{
 		Language:         "en",
 		TranslationsPath: filepath.Join("..", "..", "i18n", "locales"),
@@ -28,6 +30,8 @@ func TestNewService_English(t *testing.T) {
 }
 
 func TestNewService_Russian(t *testing.T) {
+	t.Parallel()
+
 	config := i18n.Config{
 		Language:         "ru",
 		TranslationsPath: filepath.Join("..", "..", "i18n", "locales"),
@@ -47,6 +51,8 @@ func TestNewService_Russian(t *testing.T) {
 }
 
 func TestTranslate_ExistingKey(t *testing.T) {
+	t.Parallel()
+
 	config := i18n.Config{
 		Language:         "en",
 		TranslationsPath: filepath.Join("..", "..", "i18n", "locales"),
@@ -65,6 +71,8 @@ func TestTranslate_ExistingKey(t *testing.T) {
 }
 
 func TestTranslate_MissingKey(t *testing.T) {
+	t.Parallel()
+
 	config := i18n.Config{
 		Language:         "en",
 		TranslationsPath: filepath.Join("..", "..", "i18n", "locales"),
@@ -83,6 +91,8 @@ func TestTranslate_MissingKey(t *testing.T) {
 }
 
 func TestTranslateWithArgs(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	if err := os.WriteFile(
 		filepath.Join(dir, "en.json"),
@@ -109,6 +119,8 @@ func TestTranslateWithArgs(t *testing.T) {
 }
 
 func TestNewService_InvalidLanguage(t *testing.T) {
+	t.Parallel()
+
 	config := i18n.Config{
 		Language:         "invalid",
 		TranslationsPath: filepath.Join("..", "..", "i18n", "locales"),

@@ -19,6 +19,7 @@ A service that allows sending messages to Telegram users by specifying their pho
   - [Usage](#usage)
     - [Using the API](#using-the-api)
     - [Using the Telegram Bot](#using-the-telegram-bot)
+      - [Behavior change: command matching is now case-insensitive and @suffix-agnostic](#behavior-change-command-matching-is-now-case-insensitive-and-suffix-agnostic)
   - [API Documentation](#api-documentation)
     - [Endpoints](#endpoints)
       - [Send Message](#send-message)
@@ -142,6 +143,19 @@ The service provides a REST API for sending messages. See the [API Documentation
 2. Send `/start` to register your phone number
 3. Send your contact to associate your phone number with your Telegram account
 4. You can now use this bot to send messages to registered users by providing their phone numbers.
+
+#### Behavior change: command matching is now case-insensitive and @suffix-agnostic
+
+Commands are matched with Telegram's standard command semantics (case-insensitive, `@botname` suffix
+ignored) instead of the previous exact-match, case-sensitive matcher. Two user-visible changes:
+
+- **`/STOP` now unlinks your phone association.** Previously an uppercase `/stop` variant was silently
+  ignored (no reply, nothing deleted); now it is treated as `/stop`, deletes the phone-to-chat
+  association and replies "Your association has been deleted".
+- **`/start@OtherBot` now starts the onboarding flow.** Previously a command addressed to a different
+  bot username was silently dropped; now it is treated as `/start` and replies with the welcome message.
+
+`/stop`, `/start`, `/start@<your bot>` and non-commands behave exactly as before.
 
 ## API Documentation
 

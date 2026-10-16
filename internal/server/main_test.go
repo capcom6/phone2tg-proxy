@@ -7,10 +7,10 @@ import (
 	"os"
 	"testing"
 
+	"github.com/capcom6/phone2tg-proxy/internal/config"
 	"github.com/capcom6/phone2tg-proxy/internal/proxy"
 	"github.com/capcom6/phone2tg-proxy/internal/server"
 	"github.com/go-core-fx/fiberfx"
-	"github.com/go-core-fx/fiberfx/openapi"
 	"github.com/go-core-fx/healthfx"
 	"github.com/go-core-fx/logger"
 	"github.com/go-core-fx/validatorfx"
@@ -34,23 +34,17 @@ func (stubProxy) Send(_ context.Context, _, _ string) (int, error) {
 }
 
 // newTestGraph builds the real server fx graph - the wiring internal/app.go and
-// internal/server/module.go register in production - with the two external
-// dependencies replaced: fiberfx.Config by an ephemeral 127.0.0.1:0 address and
-// proxy.Service by stubProxy. openapi.Config mirrors the default internal/config
-// produces, so the docs routes are exercised as shipped.
+// internal/server/module.go register in production - with one external
+// dependency replaced: proxy.Service by stubProxy. Everything else, including
+// fiberfx.Config and openapi.Config, comes from config.Module() reading the
+// environment TestMain planted before construction.
 func newTestGraph() *fx.App {
 	return fx.New(
 		logger.Module(),
 		logger.WithFxDefaultLogger(),
 
 		fiberfx.Module(),
-		fx.Provide(func() fiberfx.Config {
-			return fiberfx.Config{
-				Address:     "127.0.0.1:0",
-				ProxyHeader: "",
-				Proxies:     []string{},
-			}
-		}),
+		config.Module(),
 
 		healthfx.Module(),
 		// Mirrors the internal/app.go provider verbatim, including ReleaseID 0.
@@ -66,11 +60,6 @@ func newTestGraph() *fx.App {
 
 		validatorfx.Module(),
 		fx.Provide(func() proxy.Service { return stubProxy{} }),
-		fx.Supply(openapi.Config{
-			Enabled:    true,
-			PublicHost: "",
-			PublicPath: "",
-		}),
 
 		server.Module(),
 
@@ -93,7 +82,7 @@ func newTestGraph() *fx.App {
 //
 // Starting it would instead race: fasthttp.Server.Serve sets Server.done to a
 // non-nil channel (server.go:1970), so RequestCtx.Done stops returning nil, so
-// the healthfx probe's context.WithTimeout(c.Context(), 5s) spawns a
+// the healthfx probe's [context.WithTimeout] call spawns a
 // propagateCancel goroutine that reads RequestCtx.s.done - the exact field
 // fasthttp.Server.ShutdownWithContext writes to nil (server.go:2085) while
 // holding no lock it shares with that reader. That is an acknowledged upstream
@@ -108,10 +97,25 @@ func newTestGraph() *fx.App {
 // asserts Start, Stop and the port release in a non-race build; see the build
 // tag on internal/lifecycle/lifecycle_test.go for the exact reasoning.
 //
+// The sentinel configuration (test token, storage secret) and the ephemeral
+// address are planted in the process environment BEFORE construction, because
+// config.Module() reads them exactly once while the graph builds - t.Setenv
+// inside a test would arrive too late to reach the shared config.
+//
 // fx.New logs a construction failure instead of returning one, so the error is
 // surfaced here: the process exits non-zero with one clear line instead of every
 // test failing with a misleading "fiber app was not populated".
 func TestMain(m *testing.M) {
+	if err := os.Setenv("HTTP__ADDRESS", "127.0.0.1:0"); err != nil {
+		panic(err)
+	}
+	if err := os.Setenv("TELEGRAM__TOKEN", sentinelToken); err != nil {
+		panic(err)
+	}
+	if err := os.Setenv("STORAGE__SECRET", sentinelSecret); err != nil {
+		panic(err)
+	}
+
 	newTestGraph()
 
 	if sharedApp == nil {
