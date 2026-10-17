@@ -3,9 +3,10 @@ package config
 import (
 	"github.com/capcom6/phone2tg-proxy/internal/i18n"
 	"github.com/capcom6/phone2tg-proxy/internal/storage"
-	"github.com/capcom6/phone2tg-proxy/pkg/telegram"
 	"github.com/go-core-fx/fiberfx"
+	"github.com/go-core-fx/fiberfx/openapi"
 	"github.com/go-core-fx/redisfx"
+	"github.com/go-core-fx/telegofx"
 	"go.uber.org/fx"
 )
 
@@ -24,9 +25,21 @@ func Module() fx.Option {
 					Proxies:     cfg.HTTP.Proxies,
 				}
 			},
-			func(cfg Config) telegram.Config {
-				return telegram.Config{
+			func(cfg Config) openapi.Config {
+				return openapi.Config{
+					Enabled:    cfg.HTTP.OpenAPI.Enabled,
+					PublicHost: cfg.HTTP.OpenAPI.PublicHost,
+					PublicPath: cfg.HTTP.OpenAPI.PublicPath,
+				}
+			},
+			// telegofx applies ProxyURL itself by building a fasthttp SOCKS5
+			// client (telegofx/proxy.go), and an empty value means no client
+			// is built at all - there is no net/http client path left in the
+			// app after the last http factory module was removed.
+			func(cfg Config) telegofx.Config {
+				return telegofx.Config{
 					Token:    cfg.Telegram.Token,
+					Mode:     telegofx.ModePolling,
 					ProxyURL: cfg.Telegram.ProxyURL,
 				}
 			},
