@@ -19,7 +19,6 @@ A service that allows sending messages to Telegram users by specifying their pho
   - [Usage](#usage)
     - [Using the API](#using-the-api)
     - [Using the Telegram Bot](#using-the-telegram-bot)
-      - [Behavior change: command matching is now case-insensitive and @suffix-agnostic](#behavior-change-command-matching-is-now-case-insensitive-and-suffix-agnostic)
   - [API Documentation](#api-documentation)
     - [Endpoints](#endpoints)
       - [Send Message](#send-message)
@@ -66,6 +65,7 @@ A service that allows sending messages to Telegram users by specifying their pho
 2. Run the container:
    ```bash
    docker run -d \
+     --env HTTP__ADDRESS=0.0.0.0:3000 \
      --env TELEGRAM__TOKEN=your_telegram_bot_token \
      --env REDIS__URL=redis://localhost:6379/0 \
      --env STORAGE__SECRET=your_storage_secret \
@@ -98,28 +98,32 @@ The service can be configured using environment variables or a configuration fil
 
 ### Environment Variables
 
-| Variable                  | Description                     | Default                    |
-| ------------------------- | ------------------------------- | -------------------------- |
-| `HTTP__ADDRESS`           | HTTP server address             | `127.0.0.1:3000`           |
-| `HTTP__PROXY_HEADER`      | HTTP proxy header               | `X-Forwarded-For`          |
-| `HTTP__PROXIES`           | HTTP trusted proxies            | empty                      |
-| `TELEGRAM__TOKEN`         | Your Telegram bot token         | Required                   |
-| `TELEGRAM__PROXY_URL`     | SOCKS5 proxy for Telegram       | empty                      |
-| `REDIS__URL`              | Redis connection URL            | `redis://localhost:6379/0` |
-| `STORAGE__SECRET`         | Secret for phone number hashing | Required                   |
-| `I18N__DEFAULT_LANGUAGE`  | Default language                | `en`                       |
-| `I18N__TRANSLATIONS_PATH` | Translations path               | `i18n/locales`             |
+| Variable                     | Description                                   | Default                    |
+| ---------------------------- | --------------------------------------------- | -------------------------- |
+| `HTTP__ADDRESS`              | HTTP server address                           | `127.0.0.1:3000`           |
+| `HTTP__PROXY_HEADER`         | HTTP proxy header                             | `X-Forwarded-For`          |
+| `HTTP__PROXIES`              | Trusted proxy IPs/CIDRs (JSON array)          | `[]`                       |
+| `HTTP__OPENAPI__ENABLED`     | Serve the OpenAPI document and Swagger UI     | `true`                     |
+| `HTTP__OPENAPI__PUBLIC_HOST` | Host written into the served spec             | empty (taken from request) |
+| `HTTP__OPENAPI__PUBLIC_PATH` | Base path written into the served spec        | empty (keeps `/api/v1`)    |
+| `TELEGRAM__TOKEN`            | Your Telegram bot token                       | Required                   |
+| `TELEGRAM__PROXY_URL`        | SOCKS5 proxy for Telegram                     | empty                      |
+| `REDIS__URL`                 | Redis connection URL                          | `redis://localhost:6379/0` |
+| `STORAGE__SECRET`            | Secret for phone number hashing               | Required                   |
+| `I18N__DEFAULT_LANGUAGE`     | Default language                              | `en`                       |
+| `I18N__TRANSLATIONS_PATH`    | Translations path                             | `i18n/locales`             |
+| `DEBUG`                      | Development logger (process environment only) | `false`                    |
 
-Notes on `TELEGRAM__PROXY_URL` (behavior changes):
+Notes on `HTTP__PROXIES` (format):
 
-- **Only `socks5://` and `socks5h://` URLs are accepted, and they are validated at startup.** A malformed SOCKS5
-  URL such as `socks5://` with no host, or a non-SOCKS5 scheme such as `http://host:1080`, is rejected during startup
-  instead of failing later at dial time. An out-of-range port such as `socks5://127.0.0.1:99999` is still accepted at
-  startup. The scheme is matched case-insensitively, so `SOCKS5://host:1080` is accepted. Leave the variable empty for
-  no proxy.
-- **Telegram traffic no longer honours the `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY` environment variables.** The
-  bot client is built by the Telegram library on a `fasthttp` client, which resolves the proxy only from
-  `TELEGRAM__PROXY_URL`. Set that variable to route Telegram calls through a SOCKS5 proxy.
+- The value is a **JSON array** of IP addresses or CIDR ranges, for example `["10.0.0.1","10.0.0.0/8"]`. A
+  comma-separated list is not parsed - it arrives as a single malformed entry. Use `[]` to trust no proxy.
+
+Notes on `DEBUG` (scope):
+
+- The logger reads `DEBUG` from the **process environment**, not from the `.env` file - the `.env` file is only
+  parsed into the app config and is never exported into the environment. Export it in the shell
+  (`DEBUG=1 go run .`) or use `make air`, which sets it.
 
 ### Configuration File
 
@@ -143,19 +147,6 @@ The service provides a REST API for sending messages. See the [API Documentation
 2. Send `/start` to register your phone number
 3. Send your contact to associate your phone number with your Telegram account
 4. You can now use this bot to send messages to registered users by providing their phone numbers.
-
-#### Behavior change: command matching is now case-insensitive and @suffix-agnostic
-
-Commands are matched with Telegram's standard command semantics (case-insensitive, `@botname` suffix
-ignored) instead of the previous exact-match, case-sensitive matcher. Two user-visible changes:
-
-- **`/STOP` now unlinks your phone association.** Previously an uppercase `/stop` variant was silently
-  ignored (no reply, nothing deleted); now it is treated as `/stop`, deletes the phone-to-chat
-  association and replies "Your association has been deleted".
-- **`/start@OtherBot` now starts the onboarding flow.** Previously a command addressed to a different
-  bot username was silently dropped; now it is treated as `/start` and replies with the welcome message.
-
-`/stop`, `/start`, `/start@<your bot>` and non-commands behave exactly as before.
 
 ## API Documentation
 
