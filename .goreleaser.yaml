@@ -3,7 +3,9 @@ version: 2
 before:
   hooks:
     - go install github.com/swaggo/swag/cmd/swag@latest
+    # You may remove this if you don't use go modules.
     - go mod tidy
+    # you may remove this if you don't need go generate
     - go generate ./...
 
 builds:
@@ -15,6 +17,9 @@ builds:
       - darwin
     ldflags:
       - -s -w
+      - -X main.appVersion={{.Version}}
+      - -X main.appBuildDate={{.Date}}
+      - -X main.appGitCommit={{.FullCommit}}
 
 archives:
   - formats: ["tar.gz"]

@@ -11,6 +11,9 @@ concurrency:
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
+    env:
+      DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY || format('ghcr.io/{0}', github.repository_owner) }}
+      DOCKER_REGISTRY_HOST: ${{ vars.DOCKER_REGISTRY_HOST || 'ghcr.io' }}
     permissions:
       contents: read
       pull-requests: write
@@ -26,11 +29,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Login to GitHub Container registry
+      - name: Login to Container registry
         if: github.actor != 'dependabot[bot]'
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.DOCKER_REGISTRY_HOST }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
@@ -45,14 +48,15 @@ jobs:
         uses: goreleaser/goreleaser-action@v6
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY }}
+          DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
         with:
           distribution: goreleaser
           version: "~> v2"
           args: release --snapshot
 
       - name: Upload to S3
-        uses: capcom6/upload-s3-action@384aa15e46704fcbe8504212674c64a51f2f6425
+        if: github.actor != 'dependabot[bot]'
+        uses: capcom6/upload-s3-action@c4fae9e0868ea2a99ef8e9318e93821e84086955 # v2.0.0
         env:
           AWS_REGION: ${{ secrets.AWS_REGION }}
         with:
@@ -68,7 +72,7 @@ jobs:
       - name: Push images
         if: github.actor != 'dependabot[bot]'
         env:
-          DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY }}
+          DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
           PROJECT_NAME: ${{ env.PROJECT_NAME }}
         run: |
           docker tag ${{ env.DOCKER_REGISTRY }}/${{ env.PROJECT_NAME }}:latest-arm64 ${{ env.DOCKER_REGISTRY }}/${{ env.PROJECT_NAME }}:pr-${{ github.event.pull_request.number }}-arm64
@@ -81,6 +85,7 @@ jobs:
           docker manifest push ${{ env.DOCKER_REGISTRY }}/${{ env.PROJECT_NAME }}:pr-${{ github.event.pull_request.number }}
 
       - name: Find Comment
+        if: github.actor != 'dependabot[bot]'
         uses: peter-evans/find-comment@v3
         id: fc
         with:
@@ -89,9 +94,10 @@ jobs:
           body-includes: Pull request artifacts
 
       - name: Create or update comment
+        if: github.actor != 'dependabot[bot]'
         uses: peter-evans/create-or-update-comment@v4
         env:
-          DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY }}
+          DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
           PROJECT_NAME: ${{ env.PROJECT_NAME }}
         with:
           comment-id: ${{ steps.fc.outputs.comment-id }}
@@ -102,13 +108,13 @@ jobs:
             | Platform         | File                                                                                                                                                                                     |
             | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
             | 🐳 Docker         | [GitHub Container Registry](https://${{ env.DOCKER_REGISTRY }}/${{ env.PROJECT_NAME }}:pr-${{ github.event.pull_request.number }})                                                       |
-            | 🍎 Darwin arm64   | [${{ env.PROJECT_NAME }}_Darwin_arm64.tar.gz](https://github.capcom.me/${{ github.repository }}/${{ github.event.pull_request.head.sha }}/${{ env.PROJECT_NAME }}_Darwin_arm64.tar.gz)   |
-            | 🍎 Darwin x86_64  | [${{ env.PROJECT_NAME }}_Darwin_x86_64.tar.gz](https://github.capcom.me/${{ github.repository }}/${{ github.event.pull_request.head.sha }}/${{ env.PROJECT_NAME }}_Darwin_x86_64.tar.gz) |
-            | 🐧 Linux arm64    | [${{ env.PROJECT_NAME }}_Linux_arm64.tar.gz](https://github.capcom.me/${{ github.repository }}/${{ github.event.pull_request.head.sha }}/${{ env.PROJECT_NAME }}_Linux_arm64.tar.gz)     |
-            | 🐧 Linux i386     | [${{ env.PROJECT_NAME }}_Linux_i386.tar.gz](https://github.capcom.me/${{ github.repository }}/${{ github.event.pull_request.head.sha }}/${{ env.PROJECT_NAME }}_Linux_i386.tar.gz)       |
-            | 🐧 Linux x86_64   | [${{ env.PROJECT_NAME }}_Linux_x86_64.tar.gz](https://github.capcom.me/${{ github.repository }}/${{ github.event.pull_request.head.sha }}/${{ env.PROJECT_NAME }}_Linux_x86_64.tar.gz)   |
-            | 🪟 Windows arm64  | [${{ env.PROJECT_NAME }}_Windows_arm64.zip](https://github.capcom.me/${{ github.repository }}/${{ github.event.pull_request.head.sha }}/${{ env.PROJECT_NAME }}_Windows_arm64.zip)       |
-            | 🪟 Windows i386   | [${{ env.PROJECT_NAME }}_Windows_i386.zip](https://github.capcom.me/${{ github.repository }}/${{ github.event.pull_request.head.sha }}/${{ env.PROJECT_NAME }}_Windows_i386.zip)         |
-            | 🪟 Windows x86_64 | [${{ env.PROJECT_NAME }}_Windows_x86_64.zip](https://github.capcom.me/${{ github.repository }}/${{ github.event.pull_request.head.sha }}/${{ env.PROJECT_NAME }}_Windows_x86_64.zip)     |
+            | 🍎 Darwin arm64   | [${{ env.PROJECT_NAME }}_Darwin_arm64.tar.gz](https://${{ secrets.AWS_BUCKET }}/${{ github.repository }}/${{ github.event.pull_request.head.sha }}/${{ env.PROJECT_NAME }}_Darwin_arm64.tar.gz)   |
+            | 🍎 Darwin x86_64  | [${{ env.PROJECT_NAME }}_Darwin_x86_64.tar.gz](https://${{ secrets.AWS_BUCKET }}/${{ github.repository }}/${{ github.event.pull_request.head.sha }}/${{ env.PROJECT_NAME }}_Darwin_x86_64.tar.gz) |
+            | 🐧 Linux arm64    | [${{ env.PROJECT_NAME }}_Linux_arm64.tar.gz](https://${{ secrets.AWS_BUCKET }}/${{ github.repository }}/${{ github.event.pull_request.head.sha }}/${{ env.PROJECT_NAME }}_Linux_arm64.tar.gz)     |
+            | 🐧 Linux i386     | [${{ env.PROJECT_NAME }}_Linux_i386.tar.gz](https://${{ secrets.AWS_BUCKET }}/${{ github.repository }}/${{ github.event.pull_request.head.sha }}/${{ env.PROJECT_NAME }}_Linux_i386.tar.gz)       |
+            | 🐧 Linux x86_64   | [${{ env.PROJECT_NAME }}_Linux_x86_64.tar.gz](https://${{ secrets.AWS_BUCKET }}/${{ github.repository }}/${{ github.event.pull_request.head.sha }}/${{ env.PROJECT_NAME }}_Linux_x86_64.tar.gz)   |
+            | 🪟 Windows arm64  | [${{ env.PROJECT_NAME }}_Windows_arm64.zip](https://${{ secrets.AWS_BUCKET }}/${{ github.repository }}/${{ github.event.pull_request.head.sha }}/${{ env.PROJECT_NAME }}_Windows_arm64.zip)       |
+            | 🪟 Windows i386   | [${{ env.PROJECT_NAME }}_Windows_i386.zip](https://${{ secrets.AWS_BUCKET }}/${{ github.repository }}/${{ github.event.pull_request.head.sha }}/${{ env.PROJECT_NAME }}_Windows_i386.zip)         |
+            | 🪟 Windows x86_64 | [${{ env.PROJECT_NAME }}_Windows_x86_64.zip](https://${{ secrets.AWS_BUCKET }}/${{ github.repository }}/${{ github.event.pull_request.head.sha }}/${{ env.PROJECT_NAME }}_Windows_x86_64.zip)     |
 
           edit-mode: replace
