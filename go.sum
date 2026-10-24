@@ -43,6 +43,8 @@ github.com/go-core-fx/redisfx v0.0.0-20251029094515-c9e3d82dfaa2 h1:sBOvVJ3HEOHT
 github.com/go-core-fx/redisfx v0.0.0-20251029094515-c9e3d82dfaa2/go.mod h1:XUDPoiA2Z3BjbPVr0izYYUiq63nGxqsQNw/fhGWZqUk=
 github.com/go-core-fx/telegofx v0.6.1-0.20261024110432-8b0ea20bfb23 h1:Z3QorpzR6zM5a7Jw3PLwdxycvymNtDcHqF+GXohP0EE=
 github.com/go-core-fx/telegofx v0.6.1-0.20261024110432-8b0ea20bfb23/go.mod h1:LcmefDRtBZ+dOu4VgaHEuY47ge3q17Cg66Z6iseevDY=
+github.com/go-core-fx/telegofx v0.6.1-0.20261024115656-0a5b05201131 h1:Trr4ZtXOnlF9f6T7hjj1z0HZ6Jkh3mZM5xmNP2leIVg=
+github.com/go-core-fx/telegofx v0.6.1-0.20261024115656-0a5b05201131/go.mod h1:LcmefDRtBZ+dOu4VgaHEuY47ge3q17Cg66Z6iseevDY=
 github.com/go-core-fx/validatorfx v0.0.2 h1:J+POBsdqyT2Hd3TZHgJ+0eBtCPHhHff8TJLcGowQ0Ew=
 github.com/go-core-fx/validatorfx v0.0.2/go.mod h1:1VtQoOEzBo3oapXgRFA65H+zSKvmCvb6yfAcdwpqSlE=
 github.com/go-logr/logr v1.4.3 h1:CjnDlHq8ikf6E492q6eKboGOC0T8CDaOvkHCIg8idEI=
