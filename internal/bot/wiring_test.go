@@ -10,7 +10,9 @@ package bot_test
 
 import (
 	"context"
+	"net/http"
 	"testing"
+	"time"
 
 	"github.com/go-core-fx/logger"
 	"github.com/go-core-fx/telegofx"
@@ -43,10 +45,10 @@ func TestWiring_TelegofxRouterResolvesOffline(t *testing.T) {
 		logger.Module(),
 		telegofx.Module(telegofx.WithRouter()),
 		fx.Supply(telegofx.Config{
-			Token:    offlineToken,
-			Mode:     telegofx.ModePolling,
-			ProxyURL: "",
+			Token: offlineToken,
+			Mode:  telegofx.ModePolling,
 		}),
+		fx.Supply(&http.Client{Timeout: time.Second}),
 		fx.Supply([]telego.BotOption{telego.WithAPICaller(fakeCaller{})}),
 		fx.WithLogger(func() fxevent.Logger { return fxevent.NopLogger }),
 		fx.Populate(&rt),

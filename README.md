@@ -108,6 +108,7 @@ The service can be configured using environment variables or a configuration fil
 | `HTTP__OPENAPI__PUBLIC_PATH` | Base path written into the served spec        | empty (keeps `/api/v1`)    |
 | `TELEGRAM__TOKEN`            | Your Telegram bot token                       | Required                   |
 | `TELEGRAM__PROXY_URL`        | SOCKS5 proxy for Telegram                     | empty                      |
+| `TELEGRAM__TIMEOUT`          | Telegram API request bound (dial + response)  | `30s`                      |
 | `REDIS__URL`                 | Redis connection URL                          | `redis://localhost:6379/0` |
 | `STORAGE__SECRET`            | Secret for phone number hashing               | Required                   |
 | `I18N__DEFAULT_LANGUAGE`     | Default language                              | `en`                       |

@@ -6,9 +6,10 @@ require (
 	github.com/go-core-fx/config v0.1.0
 	github.com/go-core-fx/fiberfx v0.6.0
 	github.com/go-core-fx/healthfx v0.1.0
+	github.com/go-core-fx/httpfx v0.2.1-0.20261024104238-6a4c5cc40f57
 	github.com/go-core-fx/logger v0.0.1
 	github.com/go-core-fx/redisfx v0.0.0-20251029094515-c9e3d82dfaa2
-	github.com/go-core-fx/telegofx v0.5.1-0.20261015234539-37e14a4621b6
+	github.com/go-core-fx/telegofx v0.6.1-0.20261024110432-8b0ea20bfb23
 	github.com/go-core-fx/validatorfx v0.0.2
 	github.com/go-playground/validator/v10 v10.30.3
 	github.com/gofiber/fiber/v2 v2.52.14
@@ -85,7 +86,7 @@ require (
 	golang.org/x/arch v0.32.0 // indirect
 	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/mod v0.41.0 // indirect
-	golang.org/x/net v0.61.0 // indirect
+	golang.org/x/net v0.60.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/text v0.43.0 // indirect

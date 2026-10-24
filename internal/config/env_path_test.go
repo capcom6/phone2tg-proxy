@@ -9,8 +9,8 @@ package config_test
 // internal/config.Config has UNEXPORTED field types, so an external _test
 // package cannot construct one and cannot even name config.New's return value.
 // config.Module is the production seam that gets around that: it re-publishes
-// the private config as the six EXPORTED fx configs the rest of the app
-// consumes. Populating those six therefore observes the whole production path
+// the private config as the seven EXPORTED fx configs the rest of the app
+// consumes. Populating those seven therefore observes the whole production path
 //
 //	process env -> go-core-fx/config.Load (koanf) -> config.New -> config.Module -> fx graph
 //
@@ -21,16 +21,20 @@ package config_test
 // go-core-fx/config v0.1.0 (env.Provider("__", ...) + envTransform).
 // TELEGRAM__MODE is deliberately NOT set: telegramConfig has no Mode field and
 // config.Module hardcodes telegofx.ModePolling, so there is no such env key.
+// TELEGRAM__TIMEOUT is the httpfx request bound; the default 30s is overridden
+// below so a broken koanf duration decode is observable.
 
 import (
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/capcom6/phone2tg-proxy/internal/config"
 	"github.com/capcom6/phone2tg-proxy/internal/i18n"
 	"github.com/capcom6/phone2tg-proxy/internal/storage"
 	"github.com/go-core-fx/fiberfx"
 	"github.com/go-core-fx/fiberfx/openapi"
+	"github.com/go-core-fx/httpfx"
 	"github.com/go-core-fx/redisfx"
 	"github.com/go-core-fx/telegofx"
 	"go.uber.org/fx"
@@ -41,11 +45,13 @@ import (
 // built-in default in config.New, so a broken mapping is observable: the
 // defaults are 127.0.0.1:3000, X-Forwarded-For, an empty proxy list,
 // OpenAPI enabled, empty public host and path, empty telegram token and proxy
-// URL, redis://localhost:6379/0, an empty storage secret, "en" and
-// "i18n/locales".
+// URL with a 30s default timeout, redis://localhost:6379/0, an empty storage
+// secret, "en" and "i18n/locales".
 const (
 	envToken           = "123456:AAE-env-path-token-not-real"
 	envProxyURL        = "socks5h://127.0.0.1:1080"
+	envTimeout         = "45s"
+	wantTimeout        = 45 * time.Second
 	envAddress         = "0.0.0.0:8080"
 	envProxyHeader     = "X-Real-IP"
 	envProxiesJSON     = `["10.0.0.1","10.0.0.2"]`
@@ -85,6 +91,7 @@ const (
 func TestModule_EnvPathIsReadThroughKoanf(t *testing.T) {
 	t.Setenv("TELEGRAM__TOKEN", envToken)
 	t.Setenv("TELEGRAM__PROXY_URL", envProxyURL)
+	t.Setenv("TELEGRAM__TIMEOUT", envTimeout)
 	t.Setenv("HTTP__ADDRESS", envAddress)
 	t.Setenv("HTTP__PROXY_HEADER", envProxyHeader)
 	t.Setenv("HTTP__PROXIES", envProxiesJSON)
@@ -98,6 +105,7 @@ func TestModule_EnvPathIsReadThroughKoanf(t *testing.T) {
 
 	var (
 		telegofxCfg telegofx.Config
+		httpfxCfg   httpfx.Config
 		fiberfxCfg  fiberfx.Config
 		openapiCfg  openapi.Config
 		redisfxCfg  redisfx.Config
@@ -108,7 +116,7 @@ func TestModule_EnvPathIsReadThroughKoanf(t *testing.T) {
 	err := fx.New(
 		config.Module(),
 		fx.WithLogger(func() fxevent.Logger { return fxevent.NopLogger }),
-		fx.Populate(&telegofxCfg, &fiberfxCfg, &openapiCfg, &redisfxCfg, &storageCfg, &i18nCfg),
+		fx.Populate(&telegofxCfg, &httpfxCfg, &fiberfxCfg, &openapiCfg, &redisfxCfg, &storageCfg, &i18nCfg),
 	).Err()
 	if err != nil {
 		t.Fatalf("build the production config graph from the env path: %v", err)
@@ -118,9 +126,13 @@ func TestModule_EnvPathIsReadThroughKoanf(t *testing.T) {
 		t.Errorf("telegofx.Config.Token = %q, want the TELEGRAM__TOKEN value %q", telegofxCfg.Token, envToken)
 	}
 
-	if telegofxCfg.ProxyURL != envProxyURL {
-		t.Errorf("telegofx.Config.ProxyURL = %q, want the TELEGRAM__PROXY_URL value %q",
-			telegofxCfg.ProxyURL, envProxyURL)
+	if httpfxCfg.ProxyURL != envProxyURL {
+		t.Errorf("httpfx.Config.ProxyURL = %q, want the TELEGRAM__PROXY_URL value %q",
+			httpfxCfg.ProxyURL, envProxyURL)
+	}
+
+	if httpfxCfg.Timeout != wantTimeout {
+		t.Errorf("httpfx.Config.Timeout = %v, want the TELEGRAM__TIMEOUT value %v", httpfxCfg.Timeout, wantTimeout)
 	}
 
 	if telegofxCfg.Mode != telegofx.ModePolling {

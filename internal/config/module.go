@@ -5,6 +5,7 @@ import (
 	"github.com/capcom6/phone2tg-proxy/internal/storage"
 	"github.com/go-core-fx/fiberfx"
 	"github.com/go-core-fx/fiberfx/openapi"
+	"github.com/go-core-fx/httpfx"
 	"github.com/go-core-fx/redisfx"
 	"github.com/go-core-fx/telegofx"
 	"go.uber.org/fx"
@@ -32,15 +33,31 @@ func Module() fx.Option {
 					PublicPath: cfg.HTTP.OpenAPI.PublicPath,
 				}
 			},
-			// telegofx applies ProxyURL itself by building a fasthttp SOCKS5
-			// client (telegofx/proxy.go), and an empty value means no client
-			// is built at all - there is no net/http client path left in the
-			// app after the last http factory module was removed.
+			// httpfx owns the transport: SOCKS5 routing from ProxyURL and the
+			// Timeout that bounds dialing the proxy, TLS and reading the
+			// response in one deadline. Every other field stays at its
+			// inherit-the-defaults zero (pools, idle timeout, root CAs).
+			// telegofx receives the configured *http.Client from the graph
+			// (httpfx.Module) and only records call activity on it.
+			func(cfg Config) httpfx.Config {
+				return httpfx.Config{
+					ProxyURL:            cfg.Telegram.ProxyURL,
+					Timeout:             cfg.Telegram.Timeout,
+					Bypass:              "",
+					MaxIdleConns:        0,
+					MaxIdleConnsPerHost: 0,
+					IdleConnTimeout:     0,
+					TLS: httpfx.TLSConfig{
+						RootCAFile:          "",
+						RootCAPEM:           "",
+						RootCAReplaceSystem: false,
+					},
+				}
+			},
 			func(cfg Config) telegofx.Config {
 				return telegofx.Config{
-					Token:    cfg.Telegram.Token,
-					Mode:     telegofx.ModePolling,
-					ProxyURL: cfg.Telegram.ProxyURL,
+					Token: cfg.Telegram.Token,
+					Mode:  telegofx.ModePolling,
 				}
 			},
 		),

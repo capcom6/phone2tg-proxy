@@ -20,10 +20,12 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/capcom6/phone2tg-proxy/internal/bot"
 	"github.com/capcom6/phone2tg-proxy/internal/i18n"
 	"github.com/capcom6/phone2tg-proxy/internal/storage"
+	"github.com/go-core-fx/httpfx"
 	"github.com/go-core-fx/logger"
 	"github.com/go-core-fx/telegofx"
 	"github.com/mymmrac/telego"
@@ -73,10 +75,14 @@ func newBotGraph(t *testing.T) (*telegofx.Bot, *telegofx.Router) {
 
 	app := fx.New(
 		logger.Module(),
-		fx.Supply(telegofx.Config{
-			Token:    offlineToken,
-			Mode:     telegofx.ModePolling,
+		httpfx.Module(),
+		fx.Supply(httpfx.Config{
 			ProxyURL: loopbackRefusedProxy,
+			Timeout:  time.Second,
+		}),
+		fx.Supply(telegofx.Config{
+			Token: offlineToken,
+			Mode:  telegofx.ModePolling,
 		}),
 		telegofx.Module(telegofx.WithRouter(), telegofx.WithFSM()),
 		fx.Provide(func() storage.Service { return graphStubStorage{} }),

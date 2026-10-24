@@ -54,8 +54,8 @@ func Module() fx.Option {
 			fx.Private,
 		),
 		// telegofx.New requires a []telego.BotOption value in the graph. No
-		// client option is needed here: the proxy client is built inside
-		// telegofx from telegofx.Config.ProxyURL and the zap logger is
+		// client option is needed here: the *http.Client comes from httpfx
+		// (httpfx.Module, configured by config.Module) and the zap logger is
 		// appended by telegofx itself. This provider stays exported: the
 		// sibling telegofx module consumes it.
 		fx.Provide(func() []telego.BotOption {

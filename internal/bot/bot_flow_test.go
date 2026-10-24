@@ -288,17 +288,18 @@ func newFlowHarness(t *testing.T) *flowHarness {
 	}
 
 	cfg := telegofx.Config{
-		Token:    offlineToken,
-		Mode:     telegofx.ModePolling,
-		ProxyURL: "",
+		Token: offlineToken,
+		Mode:  telegofx.ModePolling,
 	}
 
 	// telegofx.New validates the token format only: no getMe, no polling
 	// (OD-C=a). Every API call the suite observes goes through the recording
-	// transport.
+	// transport, which rides the graph-provided *http.Client the signature now
+	// takes.
 	b, err := telegofx.New(
 		cfg,
-		[]telego.BotOption{telego.WithHTTPClient(&http.Client{Transport: transport})},
+		&http.Client{Transport: transport},
+		nil,
 		zap.NewNop(),
 	)
 	if err != nil {
