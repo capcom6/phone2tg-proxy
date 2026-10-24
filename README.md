@@ -214,13 +214,18 @@ Notes on the current build:
 - **`version` is always `dev` and `releaseId` is always absent.** The release linker flags in
   `.goreleaser.yaml` are `-s -w` only, so no version or build number is injected at compile time. A real
   version has to be injected before release builds can report one.
-- **`/health` and `/health/live` carry the `system:goroutines` and `system:memory` checks.** The built-in
-  provider escalates to `warn` above 100 goroutines or 128 MiB of allocated heap. Because `warn` maps to
-  `200 OK`, a small container under load shows `warn` in the body without affecting availability.
-- **`/health/ready` and `/health/startup` currently report no checks at all** and therefore always answer
-  `200 OK` with no `checks` object: no provider is registered for readiness or startup. Likewise, no
-  provider reports `fail`, so `503` is currently unreachable. Registering a provider that reports `fail` is
-  what makes these probes gate traffic.
+- **`/health` and `/health/live` carry `system:goroutines`, `system:memory` and `telegram:api`.** The
+  built-in system provider escalates to `warn` above 100 goroutines or 128 MiB of allocated heap. Because
+  `warn` maps to `200 OK`, a small container under load shows `warn` in the body without affecting
+  availability.
+- **`telegram:api` is the polling-loop watchdog** (telegofx `WithHealth`). It reports seconds since the
+  last *completed* Bot API call (`-1` before the first one) and turns `fail` once three HTTP client
+  timeouts pass without a completion - 90 s with the default `TELEGRAM__TIMEOUT`. That silence is the
+  signature of a stalled `getUpdates` loop, which produces no log line of its own. `fail` maps to `503`
+  on liveness, and the image `HEALTHCHECK` turns three consecutive failures into a task restart. External
+  Telegram outages stay `200`, because failing requests still complete and refresh the timestamp.
+- **`/health/ready` and `/health/startup` report no checks** and therefore always answer `200 OK` with no
+  `checks` object: no provider is registered for readiness or startup.
 
 ## Contributing
 

@@ -17,3 +17,13 @@ COPY i18n/locales ./i18n/locales
 
 # Command to run the executable
 ENTRYPOINT ["/app/app"]
+
+# Liveness watchdog: the telegram:api check answers 503 once no Bot API call
+# has completed for 3x TELEGRAM__TIMEOUT, so a wedged polling loop turns
+# unhealthy and the task gets restarted instead of sitting silent. The port
+# must match the port of HTTP__ADDRESS (default 3000, and the deploy sets
+# :3000) - update it together with the address; shell parameter expansion is
+# deliberately avoided here because the Dockerfile parser rejects it.
+# Alpine's busybox wget treats 503 as an error.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD wget -q -O /dev/null http://127.0.0.1:3000/health/live || exit 1

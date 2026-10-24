@@ -26,7 +26,7 @@ func Run(version healthfx.Version) {
 		httpfx.Module(),
 		//
 		config.Module(),
-		telegofx.Module(telegofx.WithRouter(), telegofx.WithFSM()),
+		telegofx.Module(telegofx.WithRouter(), telegofx.WithFSM(), telegofx.WithHealth()),
 		redisfx.Module(),
 		validatorfx.Module(),
 		//
