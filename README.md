@@ -223,9 +223,13 @@ Notes on the current build:
   client timeouts pass without a completion - 90 s with the default `TELEGRAM__TIMEOUT`. That silence
   is the signature of a stalled `getUpdates` loop, which produces no log line of its own. The heartbeat
   is scoped to the receive loop: sends and other Bot API calls do not refresh it, so outbound traffic
-  cannot mask a stalled poll. `fail` maps to `503` on liveness, and the image `HEALTHCHECK` turns three
-  consecutive failures into a task restart. External Telegram outages stay `200`, because failed
-  `getUpdates` still complete and refresh the timestamp.
+  cannot mask a stalled poll. `fail` maps to `503` on liveness. The image `HEALTHCHECK` marks the
+  container `unhealthy` after three consecutive failures: a health-aware orchestrator (for example
+  Docker Swarm) restarts the task from that state, while a standalone `docker run` container without
+  a restart policy is only marked unhealthy. The probe always requests port `3000`, so image
+  deployments must keep `HTTP__ADDRESS` on port `3000` as in the `docker run` example above - any
+  other port makes a healthy service report unhealthy. External Telegram outages stay `200`, because
+  failed `getUpdates` still complete and refresh the timestamp.
 - **`/health/ready` and `/health/startup` report no checks** and therefore always answer `200 OK` with no
   `checks` object: no provider is registered for readiness or startup.
 
