@@ -219,11 +219,13 @@ Notes on the current build:
   `warn` maps to `200 OK`, a small container under load shows `warn` in the body without affecting
   availability.
 - **`telegram:api` is the polling-loop watchdog** (telegofx `WithHealth`). It reports seconds since the
-  last *completed* Bot API call (`-1` before the first one) and turns `fail` once three HTTP client
-  timeouts pass without a completion - 90 s with the default `TELEGRAM__TIMEOUT`. That silence is the
-  signature of a stalled `getUpdates` loop, which produces no log line of its own. `fail` maps to `503`
-  on liveness, and the image `HEALTHCHECK` turns three consecutive failures into a task restart. External
-  Telegram outages stay `200`, because failing requests still complete and refresh the timestamp.
+  last *completed* `getUpdates` request (`-1` before the first one) and turns `fail` once three HTTP
+  client timeouts pass without a completion - 90 s with the default `TELEGRAM__TIMEOUT`. That silence
+  is the signature of a stalled `getUpdates` loop, which produces no log line of its own. The heartbeat
+  is scoped to the receive loop: sends and other Bot API calls do not refresh it, so outbound traffic
+  cannot mask a stalled poll. `fail` maps to `503` on liveness, and the image `HEALTHCHECK` turns three
+  consecutive failures into a task restart. External Telegram outages stay `200`, because failed
+  `getUpdates` still complete and refresh the timestamp.
 - **`/health/ready` and `/health/startup` report no checks** and therefore always answer `200 OK` with no
   `checks` object: no provider is registered for readiness or startup.
 

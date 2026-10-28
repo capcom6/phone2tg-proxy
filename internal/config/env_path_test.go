@@ -9,8 +9,8 @@ package config_test
 // internal/config.Config has UNEXPORTED field types, so an external _test
 // package cannot construct one and cannot even name config.New's return value.
 // config.Module is the production seam that gets around that: it re-publishes
-// the private config as the seven EXPORTED fx configs the rest of the app
-// consumes. Populating those seven therefore observes the whole production path
+// the private config as the eight EXPORTED fx configs the rest of the app
+// consumes. Populating those eight therefore observes the whole production path
 //
 //	process env -> go-core-fx/config.Load (koanf) -> config.New -> config.Module -> fx graph
 //
@@ -21,14 +21,17 @@ package config_test
 // go-core-fx/config v0.1.0 (env.Provider("__", ...) + envTransform).
 // TELEGRAM__MODE is deliberately NOT set: telegramConfig has no Mode field and
 // config.Module hardcodes telegofx.ModePolling, so there is no such env key.
-// TELEGRAM__TIMEOUT is the httpfx request bound; the default 30s is overridden
-// below so a broken koanf duration decode is observable.
+// TELEGRAM__TIMEOUT is the bot's request bound (bot.Config, the carrier
+// bot.Module consumes); the default 30s is overridden below so a broken
+// koanf duration decode is observable. The app-wide httpfx.Config must stay
+// at httpfx defaults - the Telegram values are asserted NOT to reach it.
 
 import (
 	"slices"
 	"testing"
 	"time"
 
+	"github.com/capcom6/phone2tg-proxy/internal/bot"
 	"github.com/capcom6/phone2tg-proxy/internal/config"
 	"github.com/capcom6/phone2tg-proxy/internal/i18n"
 	"github.com/capcom6/phone2tg-proxy/internal/storage"
@@ -70,7 +73,7 @@ const (
 // crosses the boundary - not just the telegram pair. It fails if the koanf
 // "__" delimiter, the lowercasing in go-core-fx/config's envTransform, the
 // koanf struct tags, the JSON-array coercion of HTTP__PROXIES, the env-over-
-// default precedence in config.New, or any of the six module re-publishers
+// default precedence in config.New, or any of the eight module re-publishers
 // breaks.
 //
 // It is deliberately SERIAL and subtest-free.
@@ -106,6 +109,7 @@ func TestModule_EnvPathIsReadThroughKoanf(t *testing.T) {
 	var (
 		telegofxCfg telegofx.Config
 		httpfxCfg   httpfx.Config
+		botCfg      bot.Config
 		fiberfxCfg  fiberfx.Config
 		openapiCfg  openapi.Config
 		redisfxCfg  redisfx.Config
@@ -116,7 +120,7 @@ func TestModule_EnvPathIsReadThroughKoanf(t *testing.T) {
 	err := fx.New(
 		config.Module(),
 		fx.WithLogger(func() fxevent.Logger { return fxevent.NopLogger }),
-		fx.Populate(&telegofxCfg, &httpfxCfg, &fiberfxCfg, &openapiCfg, &redisfxCfg, &storageCfg, &i18nCfg),
+		fx.Populate(&telegofxCfg, &httpfxCfg, &botCfg, &fiberfxCfg, &openapiCfg, &redisfxCfg, &storageCfg, &i18nCfg),
 	).Err()
 	if err != nil {
 		t.Fatalf("build the production config graph from the env path: %v", err)
@@ -126,13 +130,27 @@ func TestModule_EnvPathIsReadThroughKoanf(t *testing.T) {
 		t.Errorf("telegofx.Config.Token = %q, want the TELEGRAM__TOKEN value %q", telegofxCfg.Token, envToken)
 	}
 
-	if httpfxCfg.ProxyURL != envProxyURL {
-		t.Errorf("httpfx.Config.ProxyURL = %q, want the TELEGRAM__PROXY_URL value %q",
-			httpfxCfg.ProxyURL, envProxyURL)
+	if botCfg.ProxyURL != envProxyURL {
+		t.Errorf("bot.Config.ProxyURL = %q, want the TELEGRAM__PROXY_URL value %q",
+			botCfg.ProxyURL, envProxyURL)
 	}
 
-	if httpfxCfg.Timeout != wantTimeout {
-		t.Errorf("httpfx.Config.Timeout = %v, want the TELEGRAM__TIMEOUT value %v", httpfxCfg.Timeout, wantTimeout)
+	if botCfg.Timeout != wantTimeout {
+		t.Errorf("bot.Config.Timeout = %v, want the TELEGRAM__TIMEOUT value %v", botCfg.Timeout, wantTimeout)
+	}
+
+	// The app-wide client config must NOT inherit the Telegram transport:
+	// those values belong to the bot's private client only.
+	if httpfxCfg.ProxyURL != "" {
+		t.Errorf("httpfx.Config.ProxyURL = %q, want empty: TELEGRAM__PROXY_URL must not configure the app-wide client",
+			httpfxCfg.ProxyURL)
+	}
+
+	if httpfxCfg.Timeout != 0 {
+		t.Errorf(
+			"httpfx.Config.Timeout = %v, want 0 (httpfx default): TELEGRAM__TIMEOUT must not configure the app-wide client",
+			httpfxCfg.Timeout,
+		)
 	}
 
 	if telegofxCfg.Mode != telegofx.ModePolling {

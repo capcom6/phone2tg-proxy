@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/capcom6/phone2tg-proxy/internal/bot"
 	"github.com/capcom6/phone2tg-proxy/internal/i18n"
 	"github.com/capcom6/phone2tg-proxy/internal/storage"
 	"github.com/go-core-fx/fiberfx"
@@ -33,25 +34,13 @@ func Module() fx.Option {
 					PublicPath: cfg.HTTP.OpenAPI.PublicPath,
 				}
 			},
-			// httpfx owns the transport: SOCKS5 routing from ProxyURL and the
-			// Timeout that bounds dialing the proxy, TLS and reading the
-			// response in one deadline. Every other field stays at its
-			// inherit-the-defaults zero (pools, idle timeout, root CAs).
-			// telegofx receives the configured *http.Client from the graph
-			// (httpfx.Module) and only records call activity on it.
-			func(cfg Config) httpfx.Config {
-				return httpfx.Config{
-					ProxyURL:            cfg.Telegram.ProxyURL,
-					Timeout:             cfg.Telegram.Timeout,
-					Bypass:              "",
-					MaxIdleConns:        0,
-					MaxIdleConnsPerHost: 0,
-					IdleConnTimeout:     0,
-					TLS: httpfx.TLSConfig{
-						RootCAFile:          "",
-						RootCAPEM:           "",
-						RootCAReplaceSystem: false,
-					},
+			func() httpfx.Config {
+				return httpfx.Config{}
+			},
+			func(cfg Config) bot.Config {
+				return bot.Config{
+					ProxyURL: cfg.Telegram.ProxyURL,
+					Timeout:  cfg.Telegram.Timeout,
 				}
 			},
 			func(cfg Config) telegofx.Config {

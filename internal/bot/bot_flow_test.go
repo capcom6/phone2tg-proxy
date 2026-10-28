@@ -296,12 +296,12 @@ func newFlowHarness(t *testing.T) *flowHarness {
 
 	// telegofx.New validates the token format only: no getMe, no polling
 	// (OD-C=a). Every API call the suite observes goes through the recording
-	// transport, which rides the graph-provided *http.Client the signature now
-	// takes.
+	// transport passed via WithHTTPClient; telegofx wraps it with its
+	// getUpdates activity transport, which delegates transparently, so the
+	// harness's own recording still sees every call.
 	b, err := telegofx.New(
 		cfg,
-		&http.Client{Transport: transport},
-		nil,
+		[]telegofx.Option{telegofx.WithHTTPClient(&http.Client{Transport: transport})},
 		zap.NewNop(),
 	)
 	if err != nil {

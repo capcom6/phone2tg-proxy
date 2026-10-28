@@ -1,12 +1,14 @@
 package config_test
 
-// telegofx_test.go measures the production bot wiring end to end: the
-// httpfx transport config production hands httpfx (ProxyURL validation) and
-// the telegofx.Config that rides on top of the client httpfx builds. The
-// accept/reject matrix, the precedence rows and the token gate are all
-// measured through that graph (httpfx.Module + telegofx.Module(WithRouter)),
-// one supplied config per row. See graphErr for why the rows supply values
-// instead of driving the TELEGRAM__* env path.
+// telegofx_test.go measures the production bot wiring end to end: the bot
+// transport config production maps at config.Module (bot.Config, ProxyURL
+// validation) and the telegofx.Config that rides on top of the client
+// bot.Module builds from it.
+// The accept/reject matrix, the precedence rows and the token gate are all
+// measured through that graph (an inline mirror of bot.Module's private
+// client seam + telegofx.Module(WithRouter)), one supplied config per row.
+// See graphErr for why the rows supply values instead of driving the
+// TELEGRAM__* env path.
 //
 // Rejections surface from httpfx with the EXPORTED sentinel
 // httpfx.ErrInvalidProxyURL, so every rejection row asserts errors.Is
@@ -18,11 +20,13 @@ package config_test
 import (
 	"context"
 	"errors"
+	"net/http"
 	"strings"
 	"testing"
 
 	"time"
 
+	"github.com/capcom6/phone2tg-proxy/internal/bot"
 	"github.com/capcom6/phone2tg-proxy/internal/telegramtest"
 	"github.com/go-core-fx/httpfx"
 	"github.com/go-core-fx/logger"
@@ -53,7 +57,7 @@ const graphHTTPTimeout = time.Second
 
 // failedClientBuild is the dig attribution for a rejected proxy: dig names
 // the first output type of the failing constructor - httpfx's client
-// factory, whose output is *http.Client. telegofx.New never runs, so the
+// factory, whose output is *[http.Client]. telegofx.New never runs, so the
 // proxy rejection cannot carry a token error.
 const failedClientBuild = "failed to build *http.Client"
 
@@ -76,7 +80,8 @@ func graphErr(t *testing.T, token, proxyURL string, botOptions []telego.BotOptio
 	wiring := []fx.Option{
 		logger.Module(),
 		httpfx.Module(),
-		fx.Supply(httpfx.Config{
+		fx.Supply(httpfx.Config{}),
+		fx.Supply(bot.Config{
 			ProxyURL: proxyURL,
 			Timeout:  graphHTTPTimeout,
 		}),
@@ -85,7 +90,31 @@ func graphErr(t *testing.T, token, proxyURL string, botOptions []telego.BotOptio
 			Mode:  telegofx.ModePolling,
 		}),
 		telegofx.Module(telegofx.WithRouter()),
-		fx.Supply(botOptions),
+		// Mirrors bot.Module as its own fx module: the default
+		// httpfx.Factory supplies the base, the bot's OWN config overrides
+		// the transport per client behind fx.Private (module-scoped, so it
+		// shadows httpfx.Module's app-wide client exactly like production),
+		// and the exported options provider hands the client to telegofx.
+		// The case's telego options (API server, fake caller) ride
+		// WithBotOptions.
+		fx.Module(
+			"bot",
+			fx.Provide(
+				func(factory httpfx.Factory, cfg bot.Config) (*http.Client, error) {
+					return factory.NewClient(
+						httpfx.WithProxyURL(cfg.ProxyURL, ""),
+						httpfx.WithTimeout(cfg.Timeout),
+					)
+				},
+				fx.Private,
+			),
+			fx.Provide(func(client *http.Client) []telegofx.Option {
+				return []telegofx.Option{
+					telegofx.WithHTTPClient(client),
+					telegofx.WithBotOptions(botOptions...),
+				}
+			}),
+		),
 		fx.WithLogger(func() fxevent.Logger { return fxevent.NopLogger }),
 	}
 

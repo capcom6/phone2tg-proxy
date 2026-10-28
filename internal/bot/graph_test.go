@@ -76,7 +76,8 @@ func newBotGraph(t *testing.T) (*telegofx.Bot, *telegofx.Router) {
 	app := fx.New(
 		logger.Module(),
 		httpfx.Module(),
-		fx.Supply(httpfx.Config{
+		fx.Supply(httpfx.Config{}),
+		fx.Supply(bot.Config{
 			ProxyURL: loopbackRefusedProxy,
 			Timeout:  time.Second,
 		}),

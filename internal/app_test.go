@@ -60,6 +60,8 @@ func TestAppGraphServesTelegramLiveness(t *testing.T) {
 		logger.WithFxDefaultLogger(),
 		fiberfx.Module(),
 		healthfx.Module(),
+		// App-wide default HTTP client (httpfx defaults); the bot overrides
+		// it with its own private client inside bot.Module.
 		httpfx.Module(),
 		//
 		config.Module(),
