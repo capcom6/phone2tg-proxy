@@ -21,8 +21,8 @@ package config_test
 // go-core-fx/config v0.1.0 (env.Provider("__", ...) + envTransform).
 // TELEGRAM__MODE is deliberately NOT set: telegramConfig has no Mode field and
 // config.Module hardcodes telegofx.ModePolling, so there is no such env key.
-// TELEGRAM__TIMEOUT is the bot's request bound (bot.Config, the carrier
-// bot.Module consumes); the default 30s is overridden below so a broken
+// TELEGRAM__TIMEOUT is the bot's request bound (telegram.Config, the carrier
+// telegram.Module consumes); the default 30s is overridden below so a broken
 // koanf duration decode is observable. The app-wide httpfx.Config must stay
 // at httpfx defaults - the Telegram values are asserted NOT to reach it.
 
@@ -31,10 +31,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/capcom6/phone2tg-proxy/internal/bot"
 	"github.com/capcom6/phone2tg-proxy/internal/config"
 	"github.com/capcom6/phone2tg-proxy/internal/i18n"
 	"github.com/capcom6/phone2tg-proxy/internal/storage"
+	"github.com/capcom6/phone2tg-proxy/internal/telegram"
 	"github.com/go-core-fx/fiberfx"
 	"github.com/go-core-fx/fiberfx/openapi"
 	"github.com/go-core-fx/httpfx"
@@ -109,7 +109,7 @@ func TestModule_EnvPathIsReadThroughKoanf(t *testing.T) {
 	var (
 		telegofxCfg telegofx.Config
 		httpfxCfg   httpfx.Config
-		botCfg      bot.Config
+		telegramCfg telegram.Config
 		fiberfxCfg  fiberfx.Config
 		openapiCfg  openapi.Config
 		redisfxCfg  redisfx.Config
@@ -120,7 +120,16 @@ func TestModule_EnvPathIsReadThroughKoanf(t *testing.T) {
 	err := fx.New(
 		config.Module(),
 		fx.WithLogger(func() fxevent.Logger { return fxevent.NopLogger }),
-		fx.Populate(&telegofxCfg, &httpfxCfg, &botCfg, &fiberfxCfg, &openapiCfg, &redisfxCfg, &storageCfg, &i18nCfg),
+		fx.Populate(
+			&telegofxCfg,
+			&httpfxCfg,
+			&telegramCfg,
+			&fiberfxCfg,
+			&openapiCfg,
+			&redisfxCfg,
+			&storageCfg,
+			&i18nCfg,
+		),
 	).Err()
 	if err != nil {
 		t.Fatalf("build the production config graph from the env path: %v", err)
@@ -130,13 +139,13 @@ func TestModule_EnvPathIsReadThroughKoanf(t *testing.T) {
 		t.Errorf("telegofx.Config.Token = %q, want the TELEGRAM__TOKEN value %q", telegofxCfg.Token, envToken)
 	}
 
-	if botCfg.ProxyURL != envProxyURL {
-		t.Errorf("bot.Config.ProxyURL = %q, want the TELEGRAM__PROXY_URL value %q",
-			botCfg.ProxyURL, envProxyURL)
+	if telegramCfg.ProxyURL != envProxyURL {
+		t.Errorf("telegram.Config.ProxyURL = %q, want the TELEGRAM__PROXY_URL value %q",
+			telegramCfg.ProxyURL, envProxyURL)
 	}
 
-	if botCfg.Timeout != wantTimeout {
-		t.Errorf("bot.Config.Timeout = %v, want the TELEGRAM__TIMEOUT value %v", botCfg.Timeout, wantTimeout)
+	if telegramCfg.Timeout != wantTimeout {
+		t.Errorf("telegram.Config.Timeout = %v, want the TELEGRAM__TIMEOUT value %v", telegramCfg.Timeout, wantTimeout)
 	}
 
 	// The app-wide client config must NOT inherit the Telegram transport:

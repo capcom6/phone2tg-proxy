@@ -1,9 +1,9 @@
 package config
 
 import (
-	"github.com/capcom6/phone2tg-proxy/internal/bot"
 	"github.com/capcom6/phone2tg-proxy/internal/i18n"
 	"github.com/capcom6/phone2tg-proxy/internal/storage"
+	"github.com/capcom6/phone2tg-proxy/internal/telegram"
 	"github.com/go-core-fx/fiberfx"
 	"github.com/go-core-fx/fiberfx/openapi"
 	"github.com/go-core-fx/httpfx"
@@ -37,8 +37,8 @@ func Module() fx.Option {
 			func() httpfx.Config {
 				return httpfx.Config{}
 			},
-			func(cfg Config) bot.Config {
-				return bot.Config{
+			func(cfg Config) telegram.Config {
+				return telegram.Config{
 					ProxyURL: cfg.Telegram.ProxyURL,
 					Timeout:  cfg.Telegram.Timeout,
 				}

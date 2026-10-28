@@ -1,11 +1,11 @@
 package config_test
 
 // telegofx_test.go measures the production bot wiring end to end: the bot
-// transport config production maps at config.Module (bot.Config, ProxyURL
+// transport config production maps at config.Module (telegram.Config, ProxyURL
 // validation) and the telegofx.Config that rides on top of the client
-// bot.Module builds from it.
+// telegram.Module builds from it.
 // The accept/reject matrix, the precedence rows and the token gate are all
-// measured through that graph (an inline mirror of bot.Module's private
+// measured through that graph (an inline mirror of telegram.Module's private
 // client seam + telegofx.Module(WithRouter)), one supplied config per row.
 // See graphErr for why the rows supply values instead of driving the
 // TELEGRAM__* env path.
@@ -26,7 +26,7 @@ import (
 
 	"time"
 
-	"github.com/capcom6/phone2tg-proxy/internal/bot"
+	"github.com/capcom6/phone2tg-proxy/internal/telegram"
 	"github.com/capcom6/phone2tg-proxy/internal/telegramtest"
 	"github.com/go-core-fx/httpfx"
 	"github.com/go-core-fx/logger"
@@ -73,7 +73,7 @@ const failedClientBuild = "failed to build *http.Client"
 // mapping that feeds it. Supplying the very values config.Module would have
 // produced from the env keeps every row value and every assertion unchanged
 // while leaving the process environment untouched, which is what lets the matrix
-// rows run concurrently. The consumer's timeout guard (bot.Module's client
+// rows run concurrently. The consumer's timeout guard (telegram.Module's client
 // provider) is likewise not mirrored here: graphHTTPTimeout is 1s by design
 // for these construction-only rows, and guard coverage lives in the bot
 // package's timeout_test.
@@ -84,7 +84,7 @@ func graphErr(t *testing.T, token, proxyURL string, botOptions []telego.BotOptio
 		logger.Module(),
 		httpfx.Module(),
 		fx.Supply(httpfx.Config{}),
-		fx.Supply(bot.Config{
+		fx.Supply(telegram.Config{
 			ProxyURL: proxyURL,
 			Timeout:  graphHTTPTimeout,
 		}),
@@ -93,17 +93,17 @@ func graphErr(t *testing.T, token, proxyURL string, botOptions []telego.BotOptio
 			Mode:  telegofx.ModePolling,
 		}),
 		telegofx.Module(telegofx.WithRouter()),
-		// Mirrors bot.Module as its own fx module: the default
-		// httpfx.Factory supplies the base, the bot's OWN config overrides
-		// the transport per client behind fx.Private (module-scoped, so it
-		// shadows httpfx.Module's app-wide client exactly like production),
-		// and the exported options provider hands the client to telegofx.
-		// The case's telego options (API server, fake caller) ride
+		// Mirrors telegram.Module as its own fx module: the default
+		// httpfx.Factory supplies the base, the telegram module's OWN config
+		// overrides the transport per client behind fx.Private (module-scoped,
+		// so it shadows httpfx.Module's app-wide client exactly like
+		// production), and the exported options provider hands the client to
+		// telegofx. The case's telego options (API server, fake caller) ride
 		// WithBotOptions.
 		fx.Module(
-			"bot",
+			"telegram",
 			fx.Provide(
-				func(factory httpfx.Factory, cfg bot.Config) (*http.Client, error) {
+				func(factory httpfx.Factory, cfg telegram.Config) (*http.Client, error) {
 					return factory.NewClient(
 						httpfx.WithProxyURL(cfg.ProxyURL, ""),
 						httpfx.WithTimeout(cfg.Timeout),

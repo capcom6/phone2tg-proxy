@@ -5,8 +5,8 @@ package bot_test
 //
 // This is the acceptance-criteria wiring gate. The fx graph resolves
 // *telegofx.Router from telegofx.Config plus []telegofx.Option - the client
-// seam bot.Module provides - with a fake API caller riding WithBotOptions,
-// which is the exact seam internal/bot/module.go invokes against.
+// seam telegram.Module provides - with a fake API caller riding WithBotOptions,
+// which is the exact seam internal/telegram/module.go invokes against.
 // go build and go vet cannot see a missing provider; fx.New can.
 
 import (

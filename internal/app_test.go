@@ -26,6 +26,7 @@ import (
 	"github.com/capcom6/phone2tg-proxy/internal/proxy"
 	"github.com/capcom6/phone2tg-proxy/internal/server"
 	"github.com/capcom6/phone2tg-proxy/internal/storage"
+	"github.com/capcom6/phone2tg-proxy/internal/telegram"
 	"github.com/go-core-fx/fiberfx"
 	"github.com/go-core-fx/healthfx"
 	"github.com/go-core-fx/httpfx"
@@ -60,11 +61,12 @@ func TestAppGraphServesTelegramLiveness(t *testing.T) {
 		logger.WithFxDefaultLogger(),
 		fiberfx.Module(),
 		healthfx.Module(),
-		// App-wide default HTTP client (httpfx defaults); the bot overrides
-		// it with its own private client inside bot.Module.
+		// App-wide default HTTP client (httpfx defaults); the telegram module
+		// overrides it with its own private client inside telegram.Module.
 		httpfx.Module(),
 		//
 		config.Module(),
+		telegram.Module(),
 		telegofx.Module(telegofx.WithRouter(), telegofx.WithFSM(), telegofx.WithHealth()),
 		redisfx.Module(),
 		validatorfx.Module(),

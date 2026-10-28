@@ -25,6 +25,7 @@ import (
 	"github.com/capcom6/phone2tg-proxy/internal/bot"
 	"github.com/capcom6/phone2tg-proxy/internal/i18n"
 	"github.com/capcom6/phone2tg-proxy/internal/storage"
+	"github.com/capcom6/phone2tg-proxy/internal/telegram"
 	"github.com/go-core-fx/httpfx"
 	"github.com/go-core-fx/logger"
 	"github.com/go-core-fx/telegofx"
@@ -59,7 +60,8 @@ func (graphStubStorage) Delete(_ context.Context, _ int64) error {
 
 // newBotGraph constructs the production bot graph, mirroring internal/app.go
 // exactly: logger + telegofx with the router AND the FSM store module + the
-// bot module itself (group provides, invoke loop, seam). WithFSM() is
+// telegram module (the private client seam and the exported options provider)
+// + the bot module itself (group provides, invoke loop). WithFSM() is
 // load-bearing - the handlers take a *fsm.Store, so without it the
 // "handlers" value group fails to resolve. The fsm.Storage the store needs
 // comes from bot.Module() itself (the same memory backing production uses),
@@ -77,10 +79,10 @@ func newBotGraph(t *testing.T) (*telegofx.Bot, *telegofx.Router) {
 		logger.Module(),
 		httpfx.Module(),
 		fx.Supply(httpfx.Config{}),
-		fx.Supply(bot.Config{
+		fx.Supply(telegram.Config{
 			ProxyURL: loopbackRefusedProxy,
-			// Must clear the consumer guard in bot.Module: the timeout has
-			// to exceed telegofx's 8s getUpdates long-poll hold.
+			// Must clear the consumer guard in telegram.Module: the timeout
+			// has to exceed telegofx's 8s getUpdates long-poll hold.
 			Timeout: 9 * time.Second,
 		}),
 		fx.Supply(telegofx.Config{
@@ -88,6 +90,7 @@ func newBotGraph(t *testing.T) (*telegofx.Bot, *telegofx.Router) {
 			Mode:  telegofx.ModePolling,
 		}),
 		telegofx.Module(telegofx.WithRouter(), telegofx.WithFSM()),
+		telegram.Module(),
 		fx.Provide(func() storage.Service { return graphStubStorage{} }),
 		fx.Provide(func() (*i18n.Service, error) {
 			return i18n.NewService(i18n.Config{
