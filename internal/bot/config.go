@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -13,4 +14,25 @@ type Config struct {
 	ProxyURL string
 	// Timeout bounds every outgoing Bot API request end to end.
 	Timeout time.Duration
+}
+
+// minTelegramTimeout is telego's getUpdates long-poll hold: a client
+// timeout at or below it cancels every poll before it can complete, and
+// those failed polls still refresh the liveness heartbeat - so liveness
+// would stay green while the bot receives nothing. The guard lives here, at
+// the consumer, not in config.Module.
+const minTelegramTimeout = 8 * time.Second
+
+// Validate checks the config where it is consumed, before it builds the
+// bot's HTTP client: the timeout must outlive telego's 8s getUpdates
+// long-poll hold (ErrConfigInvalid wraps the detail).
+func (c Config) Validate() error {
+	if c.Timeout <= minTelegramTimeout {
+		return fmt.Errorf(
+			"%w: telegram timeout %v must be greater than the 8s getUpdates long-poll hold",
+			ErrConfigInvalid, c.Timeout,
+		)
+	}
+
+	return nil
 }

@@ -64,6 +64,10 @@ func Module() fx.Option {
 		// here, and telegofx never takes a client from the graph directly.
 		fx.Provide(
 			func(factory httpfx.Factory, cfg Config) (*http.Client, error) {
+				if err := cfg.Validate(); err != nil {
+					return nil, err
+				}
+
 				return factory.NewClient(
 					httpfx.WithProxyURL(cfg.ProxyURL, ""),
 					httpfx.WithTimeout(cfg.Timeout),

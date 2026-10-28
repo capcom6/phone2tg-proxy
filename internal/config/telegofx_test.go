@@ -73,7 +73,10 @@ const failedClientBuild = "failed to build *http.Client"
 // mapping that feeds it. Supplying the very values config.Module would have
 // produced from the env keeps every row value and every assertion unchanged
 // while leaving the process environment untouched, which is what lets the matrix
-// rows run concurrently.
+// rows run concurrently. The consumer's timeout guard (bot.Module's client
+// provider) is likewise not mirrored here: graphHTTPTimeout is 1s by design
+// for these construction-only rows, and guard coverage lives in the bot
+// package's timeout_test.
 func graphErr(t *testing.T, token, proxyURL string, botOptions []telego.BotOption, opts ...fx.Option) error {
 	t.Helper()
 

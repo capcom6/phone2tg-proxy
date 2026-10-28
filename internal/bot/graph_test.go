@@ -79,7 +79,9 @@ func newBotGraph(t *testing.T) (*telegofx.Bot, *telegofx.Router) {
 		fx.Supply(httpfx.Config{}),
 		fx.Supply(bot.Config{
 			ProxyURL: loopbackRefusedProxy,
-			Timeout:  time.Second,
+			// Must clear the consumer guard in bot.Module: the timeout has
+			// to exceed telegofx's 8s getUpdates long-poll hold.
+			Timeout: 9 * time.Second,
 		}),
 		fx.Supply(telegofx.Config{
 			Token: offlineToken,
