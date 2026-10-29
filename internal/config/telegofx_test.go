@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -34,6 +35,7 @@ import (
 	"github.com/mymmrac/telego"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
+	"go.uber.org/zap"
 )
 
 // validToken is well formed but not real. telego validates tokens against
@@ -487,5 +489,60 @@ func TestConfig_ProductionGraphGetMeThroughProxy(t *testing.T) {
 
 	if me.Username != telegramtest.FakeBotUsername {
 		t.Errorf("GetMe username = %q, want %q from the local fake API", me.Username, telegramtest.FakeBotUsername)
+	}
+}
+
+// TestConfig_PollActivityWaitsForBodyCompletion ensures response headers alone
+// do not refresh telegram:api while a getUpdates response body is stalled.
+func TestConfig_PollActivityWaitsForBodyCompletion(t *testing.T) {
+	t.Parallel()
+
+	const (
+		pollTimeout = 500 * time.Millisecond
+		settleTime  = 250 * time.Millisecond
+	)
+
+	headersSent := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"ok":true,"resu`))
+		if flusher, ok := w.(http.Flusher); ok {
+			flusher.Flush()
+		}
+		close(headersSent)
+		<-r.Context().Done()
+	}))
+	t.Cleanup(server.Close)
+
+	bot, err := telegofx.New(
+		telegofx.Config{Token: validToken, Mode: telegofx.ModePolling},
+		[]telegofx.Option{
+			telegofx.WithHTTPClient(&http.Client{Timeout: pollTimeout}),
+			telegofx.WithBotOptions(telego.WithAPIServer(server.URL)),
+		},
+		zap.NewNop(),
+	)
+	if err != nil {
+		t.Fatalf("create bot: %v", err)
+	}
+
+	result := make(chan error, 1)
+	go func() {
+		_, getUpdatesErr := bot.GetUpdates(context.Background(), &telego.GetUpdatesParams{})
+		result <- getUpdatesErr
+	}()
+
+	<-headersSent
+	time.Sleep(settleTime)
+	if !bot.LastAPIActivity().IsZero() {
+		t.Fatal("response headers must not record activity before the body completes")
+	}
+
+	if err = <-result; err == nil {
+		t.Fatal("stalled response body must fail when the client times out")
+	}
+	if bot.LastAPIActivity().IsZero() {
+		t.Fatal("completed timed-out poll must record activity")
 	}
 }

@@ -9,7 +9,7 @@ require (
 	github.com/go-core-fx/httpfx v0.2.1-0.20261024104238-6a4c5cc40f57
 	github.com/go-core-fx/logger v0.0.1
 	github.com/go-core-fx/redisfx v0.0.0-20251029094515-c9e3d82dfaa2
-	github.com/go-core-fx/telegofx v0.6.1-0.20261028001104-66e5505034c6
+	github.com/go-core-fx/telegofx v0.6.1-0.20261028020244-977dfddb70d9
 	github.com/go-core-fx/validatorfx v0.0.2
 	github.com/go-playground/validator/v10 v10.30.3
 	github.com/gofiber/fiber/v2 v2.52.14
