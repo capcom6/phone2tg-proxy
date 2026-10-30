@@ -21,6 +21,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/capcom6/phone2tg-proxy/internal/bot/handlers"
@@ -32,6 +33,7 @@ import (
 	"github.com/go-core-fx/telegofx"
 	"github.com/go-core-fx/telegofx/fsm"
 	"github.com/mymmrac/telego"
+	th "github.com/mymmrac/telego/telegohandler"
 	"go.uber.org/zap"
 )
 
@@ -288,17 +290,18 @@ func newFlowHarness(t *testing.T) *flowHarness {
 	}
 
 	cfg := telegofx.Config{
-		Token:    offlineToken,
-		Mode:     telegofx.ModePolling,
-		ProxyURL: "",
+		Token: offlineToken,
+		Mode:  telegofx.ModePolling,
 	}
 
 	// telegofx.New validates the token format only: no getMe, no polling
 	// (OD-C=a). Every API call the suite observes goes through the recording
-	// transport.
+	// transport passed via WithHTTPClient; telegofx wraps it with its
+	// getUpdates activity transport, which delegates transparently, so the
+	// harness's own recording still sees every call.
 	b, err := telegofx.New(
 		cfg,
-		[]telego.BotOption{telego.WithHTTPClient(&http.Client{Transport: transport})},
+		[]telegofx.Option{telegofx.WithHTTPClient(&http.Client{Transport: transport})},
 		zap.NewNop(),
 	)
 	if err != nil {
@@ -799,4 +802,50 @@ func TestBotFlow_reply_literals_are_distinct(t *testing.T) {
 	if fmt.Sprint(keys) != fmt.Sprint(expected) {
 		t.Errorf("literal key set drifted from i18nKeys: %v", keys)
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Panic recovery: a panicking route must not kill the process.
+// ---------------------------------------------------------------------------
+
+// TestFlow_PanicInLastRouteIsRecovered pins the telegofx default panic
+// recovery through the APP's registration order: the panic route is appended
+// AFTER start and stop, so a state-free private text falls through every app
+// route into it (first-match-wins). The first dispatch panics and comes back
+// as an error carrying the panic value; the second reaches the same route,
+// and neither dispatch leaked a reply or an FSM state change.
+func TestFlow_PanicInLastRouteIsRecovered(t *testing.T) {
+	t.Parallel()
+
+	h := newFlowHarness(t)
+
+	var calls atomic.Int32
+	h.router.Handle(func(_ *th.Context, _ telego.Update) error {
+		if calls.Add(1) == 1 {
+			panic("boom in app route")
+		}
+
+		return nil
+	})
+
+	err := h.router.BaseGroup().
+		HandleUpdate(context.Background(), h.bot.Bot, privateMessage(9901, "plain text nobody handles"))
+	if err == nil {
+		t.Fatal("first dispatch error = nil, want the recovered panic")
+	}
+	if !strings.Contains(err.Error(), "boom in app route") {
+		t.Errorf("first dispatch error = %v, want it to carry the panic value", err)
+	}
+
+	err = h.router.BaseGroup().
+		HandleUpdate(context.Background(), h.bot.Bot, privateMessage(9902, "plain text nobody handles"))
+	if err != nil {
+		t.Fatalf("second dispatch error = %v, want nil after recovery", err)
+	}
+	if got := calls.Load(); got != 2 {
+		t.Errorf("panic route calls = %d, want 2", got)
+	}
+
+	h.assertNoReply()
+	h.assertState(fsm.StateEmpty)
 }

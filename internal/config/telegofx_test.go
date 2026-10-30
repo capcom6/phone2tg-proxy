@@ -1,33 +1,41 @@
 package config_test
 
-// telegofx_test.go re-homes the deleted internal/telegramclient suite onto
-// the surviving subject: the telegofx.Config production hands telegofx, and
-// the proxy client telegofx itself builds from it. The old net/http factory
-// module is gone, so the accept/reject matrix, the precedence rows and the
-// token gate are measured through the PRODUCTION bot wiring
-// (telegofx.Module(WithRouter)), one supplied telegofx.Config per row.
-// See graphErr for why the rows supply that value instead of driving the
+// telegofx_test.go measures the production bot wiring end to end: the bot
+// transport config production maps at config.Module (telegram.Config, ProxyURL
+// validation) and the telegofx.Config that rides on top of the client
+// telegram.Module builds from it.
+// The accept/reject matrix, the precedence rows and the token gate are all
+// measured through that graph (an inline mirror of telegram.Module's private
+// client seam + telegofx.Module(WithRouter)), one supplied config per row.
+// See graphErr for why the rows supply values instead of driving the
 // TELEGRAM__* env path.
 //
-// telegofx's rejection sentinels (errUnsupportedProxyScheme, errEmptyProxyHost
-// in telegofx/proxy.go) are UNEXPORTED, so errors.Is cannot pin rejections
-// the way errors.Is(err, <transport>.ErrInvalidProxyURL) used to. Every
-// rejection row therefore asserts the EXACT measured message fragment
-// instead, plus the dig constructor attribution; acceptance rows still assert
-// errors.Is against telego's exported token sentinels.
+// Rejections surface from httpfx with the EXPORTED sentinel
+// httpfx.ErrInvalidProxyURL, so every rejection row asserts errors.Is
+// against it plus the EXACT measured message fragment and the dig
+// constructor attribution (*http.Client - httpfx builds the client before
+// telegofx.New can run); acceptance rows assert errors.Is against telego's
+// exported token sentinels.
 
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"time"
+
+	"github.com/capcom6/phone2tg-proxy/internal/telegram"
 	"github.com/capcom6/phone2tg-proxy/internal/telegramtest"
+	"github.com/go-core-fx/httpfx"
 	"github.com/go-core-fx/logger"
 	"github.com/go-core-fx/telegofx"
 	"github.com/mymmrac/telego"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
+	"go.uber.org/zap"
 )
 
 // validToken is well formed but not real. telego validates tokens against
@@ -40,16 +48,20 @@ const validToken = "123456:AAE-characterization-token-not-real"
 // construction stops at telego's token gate.
 const acceptedProxyURL = "socks5://127.0.0.1:1080"
 
-// rejectedProxyURL is rejected by telegofx's scheme check
-// (unsupported proxy scheme "http").
+// rejectedProxyURL is rejected by httpfx's scheme prefix check
+// (invalid proxy URL: "http://127.0.0.1:8080").
 const rejectedProxyURL = "http://127.0.0.1:8080"
 
-// failedBotBuild is the dig attribution for a constructor failure: dig names
-// the first output type of the failing constructor, telegofx.New, whose
-// output is *telegofx.Bot. This is the replacement for the old
-// "failed to build []telego.BotOption" prefix the telegramclient provider
-// used to produce.
-const failedBotBuild = "failed to build *telegofx.Bot"
+// graphHTTPTimeout is the httpfx request bound every row supplies; the rows
+// never dial (construction stops at the token gate or earlier), so the value
+// only has to be non-zero to keep telegofx's no-timeout warning quiet.
+const graphHTTPTimeout = time.Second
+
+// failedClientBuild is the dig attribution for a rejected proxy: dig names
+// the first output type of the failing constructor - httpfx's client
+// factory, whose output is *[http.Client]. telegofx.New never runs, so the
+// proxy rejection cannot carry a token error.
+const failedClientBuild = "failed to build *http.Client"
 
 // graphErr constructs the production-shaped graph for one configuration:
 // logger + the telegofx.Config under test + telegofx with the router, plus the
@@ -63,19 +75,51 @@ const failedBotBuild = "failed to build *telegofx.Bot"
 // mapping that feeds it. Supplying the very values config.Module would have
 // produced from the env keeps every row value and every assertion unchanged
 // while leaving the process environment untouched, which is what lets the matrix
-// rows run concurrently.
+// rows run concurrently. The consumer's timeout guard (telegram.Module's client
+// provider) is likewise not mirrored here: graphHTTPTimeout is 1s by design
+// for these construction-only rows, and guard coverage lives in the bot
+// package's timeout_test.
 func graphErr(t *testing.T, token, proxyURL string, botOptions []telego.BotOption, opts ...fx.Option) error {
 	t.Helper()
 
 	wiring := []fx.Option{
 		logger.Module(),
-		fx.Supply(telegofx.Config{
-			Token:    token,
-			Mode:     telegofx.ModePolling,
+		httpfx.Module(),
+		fx.Supply(httpfx.Config{}),
+		fx.Supply(telegram.Config{
 			ProxyURL: proxyURL,
+			Timeout:  graphHTTPTimeout,
+		}),
+		fx.Supply(telegofx.Config{
+			Token: token,
+			Mode:  telegofx.ModePolling,
 		}),
 		telegofx.Module(telegofx.WithRouter()),
-		fx.Supply(botOptions),
+		// Mirrors telegram.Module as its own fx module: the default
+		// httpfx.Factory supplies the base, the telegram module's OWN config
+		// overrides the transport per client behind fx.Private (module-scoped,
+		// so it shadows httpfx.Module's app-wide client exactly like
+		// production), and the exported options provider hands the client to
+		// telegofx. The case's telego options (API server, fake caller) ride
+		// WithBotOptions.
+		fx.Module(
+			"telegram",
+			fx.Provide(
+				func(factory httpfx.Factory, cfg telegram.Config) (*http.Client, error) {
+					return factory.NewClient(
+						httpfx.WithProxyURL(cfg.ProxyURL, ""),
+						httpfx.WithTimeout(cfg.Timeout),
+					)
+				},
+				fx.Private,
+			),
+			fx.Provide(func(client *http.Client) []telegofx.Option {
+				return []telegofx.Option{
+					telegofx.WithHTTPClient(client),
+					telegofx.WithBotOptions(botOptions...),
+				}
+			}),
+		),
 		fx.WithLogger(func() fxevent.Logger { return fxevent.NopLogger }),
 	}
 
@@ -83,11 +127,11 @@ func graphErr(t *testing.T, token, proxyURL string, botOptions []telego.BotOptio
 }
 
 // proxyCase is one row of the measured proxy-scheme matrix. Every row
-// records the OBSERVED outcome on this branch against telegofx v0.4.0, not a
-// hypothesis: a BLANK token turns acceptance into a distinguishable signal,
-// because an accepted proxy lets construction proceed to telego's token gate
-// (telego.ErrEmptyToken), while a rejected one fails earlier inside
-// telegofx.New with a message from NewSocks5Client.
+// records the OBSERVED outcome against httpfx (which builds the client), not
+// a hypothesis: a BLANK token turns acceptance into a distinguishable
+// signal, because an accepted proxy lets construction proceed to telego's
+// token gate (telego.ErrEmptyToken), while a rejected one fails earlier in
+// httpfx's client factory with httpfx.ErrInvalidProxyURL.
 type proxyCase struct {
 	name     string
 	proxyURL string
@@ -101,23 +145,24 @@ type proxyCase struct {
 }
 
 // proxySchemeMatrix is the re-measured matrix of what the production config
-// accepts now that telegofx owns the client path (was: the deleted
-// internal/telegramclient provider's net/http factory, which prefix-matched
-// the raw URL string).
+// accepts now that httpfx owns the client path (was: telegofx building its
+// own fasthttp SOCKS5 client; before that, the deleted internal/telegramclient
+// provider's net/http factory).
 //
 // Load-bearing rows:
 //
-//   - "SOCKS5://127.0.0.1:1080" FLIPS to ACCEPTED (owner-accepted SC-8 change):
-//     url.Parse lowercases the scheme before telegofx matches it, where the
-//     previous raw-prefix matcher rejected the uppercase form.
-//   - "http://..." is still REJECTED, now with telegofx's text
-//     (unsupported proxy scheme "http", expected socks5 or socks5h).
-//   - "socks5://" with no host is still REJECTED (proxy host is empty).
+//   - "SOCKS5://127.0.0.1:1080" FLIPS to REJECTED: httpfx prefix-matches the
+//     raw URL case-sensitively, so the uppercase form never reaches
+//     url.Parse. This REVERSES the earlier owner-accepted SC-8 acceptance.
+//   - "http://..." is still REJECTED, now with httpfx's text
+//     (invalid proxy URL: "<raw url>").
+//   - "socks5://" with no host is still REJECTED (invalid proxy URL: empty
+//     hostname).
 //   - "socks5://127.0.0.1:99999" is still ACCEPTED: neither implementation
 //     range-checks the port at construction time.
-//   - Scheme rejections name only the lowercased scheme, NOT the raw URL;
-//     parse failures and the empty-host rejection echo the raw URL inside the
-//     measured fragment.
+//   - Scheme rejections and parse failures echo the RAW URL (httpfx
+//     prefix-matches before parsing, and collapses parse failures to the bare
+//     sentinel); the empty-host rejection reports the hostname reason.
 var proxySchemeMatrix = []proxyCase{
 	{name: "empty string uses the default transport", proxyURL: "", wantAccept: true, wantReject: ""},
 	{name: "socks5 with host and port", proxyURL: acceptedProxyURL, wantAccept: true, wantReject: ""},
@@ -139,91 +184,91 @@ var proxySchemeMatrix = []proxyCase{
 		name:       "socks5 with no host is rejected",
 		proxyURL:   "socks5://",
 		wantAccept: false,
-		wantReject: `proxy host is empty: "socks5://"`,
+		wantReject: `invalid proxy URL: empty hostname`,
 	},
 	{
-		name:       "uppercase SOCKS5 is accepted SC-8 flip",
+		name:       "uppercase SOCKS5 is rejected case-sensitive prefix SC-8 reversal",
 		proxyURL:   "SOCKS5://127.0.0.1:1080",
-		wantAccept: true,
-		wantReject: "",
+		wantAccept: false,
+		wantReject: `invalid proxy URL: "SOCKS5://127.0.0.1:1080"`,
 	},
 	{
 		name:       "http proxy",
 		proxyURL:   rejectedProxyURL,
 		wantAccept: false,
-		wantReject: `unsupported proxy scheme "http", expected socks5 or socks5h`,
+		wantReject: `invalid proxy URL: "http://127.0.0.1:8080"`,
 	},
 	{
 		name:       "https proxy",
 		proxyURL:   "https://127.0.0.1:8080",
 		wantAccept: false,
-		wantReject: `unsupported proxy scheme "https", expected socks5 or socks5h`,
+		wantReject: `invalid proxy URL: "https://127.0.0.1:8080"`,
 	},
 	{
 		name:       "http proxy with no host",
 		proxyURL:   "http://",
 		wantAccept: false,
-		wantReject: `unsupported proxy scheme "http", expected socks5 or socks5h`,
+		wantReject: `invalid proxy URL: "http://"`,
 	},
 	{
-		name:       "uppercase HTTP is rejected with the lowercased scheme",
+		name:       "uppercase HTTP is rejected with the raw URL",
 		proxyURL:   "HTTP://127.0.0.1:8080",
 		wantAccept: false,
-		wantReject: `unsupported proxy scheme "http", expected socks5 or socks5h`,
+		wantReject: `invalid proxy URL: "HTTP://127.0.0.1:8080"`,
 	},
 	{
 		name:       "direct scheme is not registered",
 		proxyURL:   "direct://127.0.0.1",
 		wantAccept: false,
-		wantReject: `unsupported proxy scheme "direct", expected socks5 or socks5h`,
+		wantReject: `invalid proxy URL: "direct://127.0.0.1"`,
 	},
 	{
 		name:       "socks4 is not registered",
 		proxyURL:   "socks4://127.0.0.1:1080",
 		wantAccept: false,
-		wantReject: `unsupported proxy scheme "socks4", expected socks5 or socks5h`,
+		wantReject: `invalid proxy URL: "socks4://127.0.0.1:1080"`,
 	},
 	{
 		name:       "unix socket scheme is not registered",
 		proxyURL:   "unix:///tmp/proxy.sock",
 		wantAccept: false,
-		wantReject: `unsupported proxy scheme "unix", expected socks5 or socks5h`,
+		wantReject: `invalid proxy URL: "unix:///tmp/proxy.sock"`,
 	},
 	{
 		name:       "unparseable text has no scheme",
 		proxyURL:   "not a url",
 		wantAccept: false,
-		wantReject: `unsupported proxy scheme "", expected socks5 or socks5h`,
+		wantReject: `invalid proxy URL: "not a url"`,
 	},
 	{
 		name:       "host and port without a scheme fails to parse",
 		proxyURL:   "127.0.0.1:1080",
 		wantAccept: false,
-		wantReject: `parse proxy url: parse "127.0.0.1:1080": first path segment in URL cannot contain colon`,
+		wantReject: `invalid proxy URL: "127.0.0.1:1080"`,
 	},
 	{
 		name:       "missing protocol separator fails to parse",
 		proxyURL:   "://127.0.0.1",
 		wantAccept: false,
-		wantReject: `parse proxy url: parse "://127.0.0.1": missing protocol scheme`,
+		wantReject: `invalid proxy URL: "://127.0.0.1"`,
 	},
 	{
 		name:       "unterminated IPv6 literal fails to parse",
 		proxyURL:   "socks5://[::1",
 		wantAccept: false,
-		wantReject: `parse proxy url: parse "socks5://[::1": missing ']' in host`,
+		wantReject: `invalid proxy URL`,
 	},
 	{
 		name:       "non numeric port fails to parse",
 		proxyURL:   "socks5://127.0.0.1:notaport",
 		wantAccept: false,
-		wantReject: `parse proxy url: parse "socks5://127.0.0.1:notaport": invalid port ":notaport" after host`,
+		wantReject: `invalid proxy URL`,
 	},
 	{
 		name:       "leading space fails to parse",
 		proxyURL:   " socks5://127.0.0.1:1080",
 		wantAccept: false,
-		wantReject: `parse proxy url: parse " socks5://127.0.0.1:1080": first path segment in URL cannot contain colon`,
+		wantReject: `invalid proxy URL: " socks5://127.0.0.1:1080"`,
 	},
 }
 
@@ -252,8 +297,8 @@ func TestConfig_ProxySchemeMatrix(t *testing.T) {
 	}
 }
 
-// assertAccepted pins that the proxy client was built (or skipped for "") and
-// the graph only stopped at telego's token gate.
+// assertAccepted pins that httpfx built the client (or skipped the build for
+// "") and the graph only stopped at telego's token gate.
 func assertAccepted(t *testing.T, proxyURL string, err error) {
 	t.Helper()
 
@@ -261,15 +306,15 @@ func assertAccepted(t *testing.T, proxyURL string, err error) {
 		t.Errorf("graph(%q) error %v, want errors.Is telego.ErrEmptyToken", proxyURL, err)
 	}
 
-	if strings.Contains(err.Error(), "create socks5 client") {
-		t.Errorf("graph(%q) error %v, want NOT a socks5 client rejection for an accepted proxy", proxyURL, err)
+	if errors.Is(err, httpfx.ErrInvalidProxyURL) {
+		t.Errorf("graph(%q) error %v, want NOT an httpfx proxy rejection for an accepted proxy", proxyURL, err)
 	}
 }
 
-// assertRejected pins that telegofx itself refused the URL: the dig
-// attribution names the failing constructor, the measured message fragment is
-// intact, and telego's token gate never ran. The fragment assertion IS the
-// sentinel replacement - telegofx's sentinels are unexported.
+// assertRejected pins that httpfx refused the URL: the dig attribution names
+// the failing constructor (*http.Client), the exported sentinel matches via
+// [errors.Is], and the measured message fragment is intact. telego's token
+// gate never ran because telegofx.New never executed.
 func assertRejected(t *testing.T, proxyURL, wantReject string, err error) {
 	t.Helper()
 
@@ -277,15 +322,17 @@ func assertRejected(t *testing.T, proxyURL, wantReject string, err error) {
 		t.Errorf("graph(%q) error %v, want NOT a token error: the proxy rejection happens first", proxyURL, err)
 	}
 
-	if !strings.Contains(err.Error(), failedBotBuild) {
-		t.Errorf("graph(%q) error %q, want it to carry the dig attribution %q", proxyURL, err.Error(), failedBotBuild)
+	if !errors.Is(err, httpfx.ErrInvalidProxyURL) {
+		t.Errorf("graph(%q) error %v, want errors.Is httpfx.ErrInvalidProxyURL", proxyURL, err)
 	}
 
-	// Every rejection is wrapped by telegofx.New with its operation prefix
-	// before it reaches dig; the rows then pin the sentinel message itself.
-	if !strings.Contains(err.Error(), "create socks5 client") {
-		t.Errorf("graph(%q) error %q, want it to carry the operation prefix %q",
-			proxyURL, err.Error(), "create socks5 client")
+	if !strings.Contains(err.Error(), failedClientBuild) {
+		t.Errorf(
+			"graph(%q) error %q, want it to carry the dig attribution %q",
+			proxyURL,
+			err.Error(),
+			failedClientBuild,
+		)
 	}
 
 	if !strings.Contains(err.Error(), wantReject) {
@@ -294,9 +341,10 @@ func assertRejected(t *testing.T, proxyURL, wantReject string, err error) {
 }
 
 // TestConfig_ProxyErrorPrecedence pins the three token/proxy precedence cases
-// observable through the production graph. telegofx.New builds the proxy
-// client BEFORE telego.NewBot, so a proxy rejection beats the token gate in
-// every combination - the OD-6 shape survives the transport swap.
+// observable through the production graph. httpfx builds the client as a
+// dependency of telegofx.New, so a proxy rejection surfaces before telego.NewBot
+// can run and beats the token gate in every combination - the OD-6 shape
+// survives the transport swap.
 func TestConfig_ProxyErrorPrecedence(t *testing.T) {
 	t.Parallel()
 
@@ -320,14 +368,14 @@ func TestConfig_ProxyErrorPrecedence(t *testing.T) {
 			name:        "valid token with a rejected proxy yields the proxy rejection",
 			token:       validToken,
 			proxyURL:    rejectedProxyURL,
-			wantContain: `unsupported proxy scheme "http", expected socks5 or socks5h`,
+			wantContain: `invalid proxy URL: "http://127.0.0.1:8080"`,
 			wantErrIs:   nil,
 		},
 		{
 			name:        "blank token with a rejected proxy yields the proxy rejection per OD-6",
 			token:       "",
 			proxyURL:    rejectedProxyURL,
-			wantContain: `unsupported proxy scheme "http", expected socks5 or socks5h`,
+			wantContain: `invalid proxy URL: "http://127.0.0.1:8080"`,
 			wantErrIs:   nil,
 		},
 	}
@@ -405,17 +453,16 @@ func TestConfig_TokenGateRejectsWhitespace(t *testing.T) {
 
 // TestConfig_ProductionGraphGetMeThroughProxy boots the production bot wiring
 // with the bot wired in and reads the bot's identity back through the ACTIVE
-// client path: telegofx's fasthttp SOCKS5 client (built from the ProxyURL
-// production supplies) -> the loopback SOCKS5 tunnel -> the local fake
-// Bot API. No packet leaves the machine - the tunnel ignores the requested
-// destination and dials the loopback fake.
+// client path: httpfx's SOCKS5 client (built from the ProxyURL production
+// supplies) -> the loopback SOCKS5 tunnel -> the local fake Bot API. No
+// packet leaves the machine - the tunnel ignores the requested destination
+// and dials the loopback fake.
 //
 // Three deviations from production, all test-only: the bot options carry
-// telego.WithAPIServer pointing at plain http (telegofx's fasthttp client
-// exposes no CA seam, so an offline TLS hop could not be trusted), the
-// graph is construction-only - Start is never called, so no polling begins -
-// and the telegofx.Config is supplied rather than mapped from the env, as
-// graphErr explains.
+// telego.WithAPIServer pointing at plain http (the fake cannot present a
+// trusted TLS certificate offline), the graph is construction-only - Start is
+// never called, so no polling begins - and the configs are supplied rather
+// than mapped from the env, as graphErr explains.
 func TestConfig_ProductionGraphGetMeThroughProxy(t *testing.T) {
 	t.Parallel()
 
@@ -442,5 +489,60 @@ func TestConfig_ProductionGraphGetMeThroughProxy(t *testing.T) {
 
 	if me.Username != telegramtest.FakeBotUsername {
 		t.Errorf("GetMe username = %q, want %q from the local fake API", me.Username, telegramtest.FakeBotUsername)
+	}
+}
+
+// TestConfig_PollActivityWaitsForBodyCompletion ensures response headers alone
+// do not refresh telegram:api while a getUpdates response body is stalled.
+func TestConfig_PollActivityWaitsForBodyCompletion(t *testing.T) {
+	t.Parallel()
+
+	const (
+		pollTimeout = 500 * time.Millisecond
+		settleTime  = 250 * time.Millisecond
+	)
+
+	headersSent := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"ok":true,"resu`))
+		if flusher, ok := w.(http.Flusher); ok {
+			flusher.Flush()
+		}
+		close(headersSent)
+		<-r.Context().Done()
+	}))
+	t.Cleanup(server.Close)
+
+	bot, err := telegofx.New(
+		telegofx.Config{Token: validToken, Mode: telegofx.ModePolling},
+		[]telegofx.Option{
+			telegofx.WithHTTPClient(&http.Client{Timeout: pollTimeout}),
+			telegofx.WithBotOptions(telego.WithAPIServer(server.URL)),
+		},
+		zap.NewNop(),
+	)
+	if err != nil {
+		t.Fatalf("create bot: %v", err)
+	}
+
+	result := make(chan error, 1)
+	go func() {
+		_, getUpdatesErr := bot.GetUpdates(context.Background(), &telego.GetUpdatesParams{})
+		result <- getUpdatesErr
+	}()
+
+	<-headersSent
+	time.Sleep(settleTime)
+	if !bot.LastAPIActivity().IsZero() {
+		t.Fatal("response headers must not record activity before the body completes")
+	}
+
+	if err = <-result; err == nil {
+		t.Fatal("stalled response body must fail when the client times out")
+	}
+	if bot.LastAPIActivity().IsZero() {
+		t.Fatal("completed timed-out poll must record activity")
 	}
 }
