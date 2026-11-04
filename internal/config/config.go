@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/go-core-fx/config"
 )
@@ -20,8 +21,9 @@ type httpConfig struct {
 }
 
 type telegramConfig struct {
-	Token    string `koanf:"token"`
-	ProxyURL string `koanf:"proxy_url"`
+	Token    string        `koanf:"token"`
+	ProxyURL string        `koanf:"proxy_url"`
+	Timeout  time.Duration `koanf:"timeout"`
 }
 
 type redisConfig struct {
@@ -46,6 +48,7 @@ type Config struct {
 }
 
 func New() (Config, error) {
+	//nolint:mnd // default values
 	cfg := Config{
 		HTTP: httpConfig{
 			Address:     "127.0.0.1:3000",
@@ -60,6 +63,7 @@ func New() (Config, error) {
 		Telegram: telegramConfig{
 			Token:    "",
 			ProxyURL: "",
+			Timeout:  30 * time.Second,
 		},
 		Redis: redisConfig{
 			URL: "redis://localhost:6379/0",

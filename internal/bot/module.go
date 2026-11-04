@@ -8,7 +8,6 @@ import (
 	"github.com/go-core-fx/logger"
 	"github.com/go-core-fx/telegofx"
 	"github.com/go-core-fx/telegofx/fsm"
-	"github.com/mymmrac/telego"
 	"go.uber.org/fx"
 )
 
@@ -53,14 +52,7 @@ func Module() fx.Option {
 			fx.Annotate(stop.New, fx.ResultTags(`group:"handlers"`)),
 			fx.Private,
 		),
-		// telegofx.New requires a []telego.BotOption value in the graph. No
-		// client option is needed here: the proxy client is built inside
-		// telegofx from telegofx.Config.ProxyURL and the zap logger is
-		// appended by telegofx itself. This provider stays exported: the
-		// sibling telegofx module consumes it.
-		fx.Provide(func() []telego.BotOption {
-			return []telego.BotOption{}
-		}),
+
 		// Handlers register directly on the shared router - the owner's
 		// reference pattern; the central registration type is gone.
 		fx.Invoke(fx.Annotate(
