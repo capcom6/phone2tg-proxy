@@ -4,13 +4,16 @@ package bot_test
 // resolves OFFLINE through fx: construction only, no graph Start, no network.
 //
 // This is the acceptance-criteria wiring gate. The fx graph resolves
-// *telegofx.Router from telegofx.Config plus []telego.BotOption with a fake
-// API caller, which is the exact seam internal/bot/module.go invokes against.
+// *telegofx.Router from telegofx.Config plus []telegofx.Option - the client
+// seam telegram.Module provides - with a fake API caller riding WithBotOptions,
+// which is the exact seam internal/telegram/module.go invokes against.
 // go build and go vet cannot see a missing provider; fx.New can.
 
 import (
 	"context"
+	"net/http"
 	"testing"
+	"time"
 
 	"github.com/go-core-fx/logger"
 	"github.com/go-core-fx/telegofx"
@@ -43,11 +46,13 @@ func TestWiring_TelegofxRouterResolvesOffline(t *testing.T) {
 		logger.Module(),
 		telegofx.Module(telegofx.WithRouter()),
 		fx.Supply(telegofx.Config{
-			Token:    offlineToken,
-			Mode:     telegofx.ModePolling,
-			ProxyURL: "",
+			Token: offlineToken,
+			Mode:  telegofx.ModePolling,
 		}),
-		fx.Supply([]telego.BotOption{telego.WithAPICaller(fakeCaller{})}),
+		fx.Supply([]telegofx.Option{
+			telegofx.WithHTTPClient(&http.Client{Timeout: time.Second}),
+			telegofx.WithBotOptions(telego.WithAPICaller(fakeCaller{})),
+		}),
 		fx.WithLogger(func() fxevent.Logger { return fxevent.NopLogger }),
 		fx.Populate(&rt),
 	).Err()

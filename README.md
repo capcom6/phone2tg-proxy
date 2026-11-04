@@ -108,6 +108,7 @@ The service can be configured using environment variables or a configuration fil
 | `HTTP__OPENAPI__PUBLIC_PATH` | Base path written into the served spec        | empty (keeps `/api/v1`)    |
 | `TELEGRAM__TOKEN`            | Your Telegram bot token                       | Required                   |
 | `TELEGRAM__PROXY_URL`        | SOCKS5 proxy for Telegram                     | empty                      |
+| `TELEGRAM__TIMEOUT`          | Telegram API request bound (dial + response)  | `30s`                      |
 | `REDIS__URL`                 | Redis connection URL                          | `redis://localhost:6379/0` |
 | `STORAGE__SECRET`            | Secret for phone number hashing               | Required                   |
 | `I18N__DEFAULT_LANGUAGE`     | Default language                              | `en`                       |
@@ -213,13 +214,24 @@ Notes on the current build:
 - **`version` is always `dev` and `releaseId` is always absent.** The release linker flags in
   `.goreleaser.yaml` are `-s -w` only, so no version or build number is injected at compile time. A real
   version has to be injected before release builds can report one.
-- **`/health` and `/health/live` carry the `system:goroutines` and `system:memory` checks.** The built-in
-  provider escalates to `warn` above 100 goroutines or 128 MiB of allocated heap. Because `warn` maps to
-  `200 OK`, a small container under load shows `warn` in the body without affecting availability.
-- **`/health/ready` and `/health/startup` currently report no checks at all** and therefore always answer
-  `200 OK` with no `checks` object: no provider is registered for readiness or startup. Likewise, no
-  provider reports `fail`, so `503` is currently unreachable. Registering a provider that reports `fail` is
-  what makes these probes gate traffic.
+- **`/health` and `/health/live` carry `system:goroutines`, `system:memory` and `telegram:api`.** The
+  built-in system provider escalates to `warn` above 100 goroutines or 128 MiB of allocated heap. Because
+  `warn` maps to `200 OK`, a small container under load shows `warn` in the body without affecting
+  availability.
+- **`telegram:api` is the polling-loop watchdog** (telegofx `WithHealth`). It reports seconds since the
+  last *completed* `getUpdates` request (`-1` before the first one) and turns `fail` once three HTTP
+  client timeouts pass without a completion - 90 s with the default `TELEGRAM__TIMEOUT`. That silence
+  is the signature of a stalled `getUpdates` loop, which produces no log line of its own. The heartbeat
+  is scoped to the receive loop: sends and other Bot API calls do not refresh it, so outbound traffic
+  cannot mask a stalled poll. `fail` maps to `503` on liveness. The image `HEALTHCHECK` marks the
+  container `unhealthy` after three consecutive failures: a health-aware orchestrator (for example
+  Docker Swarm) restarts the task from that state, while a standalone `docker run` container without
+  a restart policy is only marked unhealthy. The probe always requests port `3000`, so image
+  deployments must keep `HTTP__ADDRESS` on port `3000` as in the `docker run` example above - any
+  other port makes a healthy service report unhealthy. External Telegram outages stay `200`, because
+  failed `getUpdates` still complete and refresh the timestamp.
+- **`/health/ready` and `/health/startup` report no checks** and therefore always answer `200 OK` with no
+  `checks` object: no provider is registered for readiness or startup.
 
 ## Contributing
 
